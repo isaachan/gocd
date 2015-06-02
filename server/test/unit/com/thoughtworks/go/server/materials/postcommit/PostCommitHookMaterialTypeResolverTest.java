@@ -16,6 +16,9 @@
 
 package com.thoughtworks.go.server.materials.postcommit;
 
+import com.thoughtworks.go.server.materials.postcommit.git.GitPostCommitHookImplementer;
+import com.thoughtworks.go.server.materials.postcommit.mercurial.MercurialPostCommitHookImplementer;
+import com.thoughtworks.go.server.materials.postcommit.pluggablescm.PluggableSCMPostCommitHookImplementer;
 import com.thoughtworks.go.server.materials.postcommit.svn.SvnPostCommitHookImplementer;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,5 +53,30 @@ public class PostCommitHookMaterialTypeResolverTest {
         assertThat(materialType.getImplementer() instanceof SvnPostCommitHookImplementer, is(true));
     }
 
+    @Test
+    public void shouldReturnGitPostCommitHookMaterialType() {
+        final PostCommitHookMaterialType materialType = resolver.toType("GIT");
+        assertThat(materialType instanceof PostCommitHookMaterialTypeResolver.GitPostCommitHookMaterialType, is(true));
+        assertThat(materialType.isKnown(), is(true));
+        assertThat(materialType.isValid("GIT"), is(true));
+        assertThat(materialType.getImplementer() instanceof GitPostCommitHookImplementer, is(true));
+    }
 
+    @Test
+    public void shouldReturnMercurialPostCommitHookMaterialType() {
+        final PostCommitHookMaterialType materialType = resolver.toType("HG");
+        assertThat(materialType instanceof PostCommitHookMaterialTypeResolver.MercurialPostCommitHookMaterialType, is(true));
+        assertThat(materialType.isKnown(), is(true));
+        assertThat(materialType.isValid("hg"), is(true));
+        assertThat(materialType.getImplementer() instanceof MercurialPostCommitHookImplementer, is(true));
+    }
+
+    @Test
+    public void shouldReturnPluggableSCMPostCommitHookMaterialTypeWithCaseInsensitivity() {
+        final PostCommitHookMaterialType materialType = resolver.toType("SCM");
+        assertThat(materialType instanceof PostCommitHookMaterialTypeResolver.PluggableSCMPostCommitHookMaterialType, is(true));
+        assertThat(materialType.isKnown(), is(true));
+        assertThat(materialType.isValid("scm"), is(true));
+        assertThat(materialType.getImplementer() instanceof PluggableSCMPostCommitHookImplementer, is(true));
+    }
 }

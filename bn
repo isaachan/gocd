@@ -21,7 +21,7 @@ else
     project_root=`echo $0 | sed -e 's#\/bn$##g'`
 fi
 export TF_CLC_HOME=$project_root/tfs-tool
-unset GEM_HOME
-unset GEM_PATH
-$(dirname $0)/tools/jruby-1.7.3/bin/jruby -J-Xmx2048m -S buildr $*
 
+export JRUBY_OPTS='-J-XX:+TieredCompilation -J-XX:TieredStopAtLevel=1 -J-Djruby.compile.invokedynamic=false -J-Dcompile.mode=OFF'
+
+exec $(dirname $0)/tools/bin/jruby -S buildr "$@"

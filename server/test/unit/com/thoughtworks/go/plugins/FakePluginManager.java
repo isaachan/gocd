@@ -1,5 +1,5 @@
 /*************************GO-LICENSE-START*********************************
- * Copyright 2014 ThoughtWorks, Inc.
+ * Copyright 2015 ThoughtWorks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,9 @@ package com.thoughtworks.go.plugins;
 
 import java.util.List;
 
+import com.thoughtworks.go.plugin.api.GoPluginIdentifier;
+import com.thoughtworks.go.plugin.api.request.GoPluginApiRequest;
+import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.infra.Action;
 import com.thoughtworks.go.plugin.infra.ActionWithReturn;
 import com.thoughtworks.go.plugin.infra.ExceptionHandler;
@@ -57,12 +60,17 @@ public abstract class FakePluginManager implements PluginManager {
     }
 
     @Override
-    public void startPluginInfrastructure() {
+    public void startInfrastructure() {
         throw new RuntimeException("Not implemented yet");
     }
 
     @Override
-    public void stopPluginInfrastructure() {
+    public void registerPluginsFolderChangeListener() {
+        throw new RuntimeException("Not implemented yet");
+    }
+
+    @Override
+    public void stopInfrastructure() {
         throw new RuntimeException("Not implemented yet");
     }
 
@@ -74,5 +82,20 @@ public abstract class FakePluginManager implements PluginManager {
     @Override
     public <T> void doOnAll(Class<T> serviceReferenceClass, Action<T> actionToDoOnEachRegisteredServiceWhichMatches) {
         throw new RuntimeException("Not implemented yet");
+    }
+
+    @Override
+    public GoPluginApiResponse submitTo(String pluginId, GoPluginApiRequest apiRequest) {
+        return null;
+    }
+
+    @Override
+    public List<GoPluginIdentifier> allPluginsOfType(String extension) {
+        return null;
+    }
+
+    @Override
+    public String resolveExtensionVersion(String pluginId, List<String> goSupportedExtensionVersions) {
+        return null;
     }
 }

@@ -31,6 +31,8 @@
     <entry key="ADMIN">管理</entry>
     <entry key="HELP">ヘルプ</entry>
     <entry key="HELP_SMALL">ヘルプ</entry>
+    <entry key="PLUGINS">Plugins</entry>
+    <entry key="APIS">APIs</entry>
     <entry key="COMMUNITY">コミュニティ</entry>
     <entry key="SUPPORT">サポート</entry>
     <entry key="CCTRAY_FEED">CCTray フィード</entry>
@@ -56,7 +58,12 @@
     <entry key="ACTIVE">Active</entry>
     <entry key="RERUN">RERUN</entry>
     <entry key="PIPELINE_CANNOT_VIEW">You do not have view permissions for pipeline ''{0}''.</entry>
+    <entry key="PIPELINE_CANNOT_OPERATE">You do not have operate permissions for pipeline ''{0}''.</entry>
     <entry key="MATERIAL_WITH_FINGERPRINT_NOT_FOUND">Pipeline ''{0}'' does not contain material with fingerprint ''{1}''.</entry>
+    <entry key="MATERIAL_CANNOT_VIEW">You do not have view permissions for material with fingerprint ''{0}''.</entry>
+    <entry key="MATERIAL_CONFIG_WITH_FINGERPRINT_NOT_FOUND">Material with fingerprint ''{0}'' not found.</entry>
+    <entry key="MATERIAL_INSTANCE_WITH_FINGERPRINT_NOT_FOUND">Material Instance with fingerprint ''{0}'' not found.</entry>
+    <entry key="MATERIAL_MODIFICATION_NOT_FOUND">Modification ''{1}'' for material with fingerprint ''{0}'' not found.</entry>
     <entry key="STAGE_DETAIL">Stage Detail</entry>
     <entry key="PIPELINE_DETAIL">Pipeline Detail</entry>
     <entry key="RUN:">Run:</entry>
@@ -208,7 +215,8 @@
     <entry key="USERNAME">Username</entry>
     <entry key="DOMAIN">Domain</entry>
     <entry key="PASSWORD">Password</entry>
-    <entry key="MAIL_HOST_USE_TLS">Use TLS</entry>
+    <entry key="MAIL_HOST_USE_SMTPS">Use SMTPS</entry>
+    <entry key="TOOLTIP_MAIL_HOST_SMTPS">This changes the protocol used to send the mail. It switches between SMTP and SMTPS. To enable STARTLS support, for providers such as GMail and Office 365, see <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/configuration/admin_mailhost_info.html#starttls' target='_blank'>this page in the documentation</a>.]]></entry>
     <entry key="MAIL_HOST_FROM">From</entry>
     <entry key="MAIL_HOST_ADMIN_MAIL">Admin mail</entry>
     <entry key="MAIL_HOST_SEND_TEST_EMAIL">SEND TEST EMAIL</entry>
@@ -345,7 +353,12 @@
     <entry key="JOB">Job</entry>
     <entry key="RESOURCES">Resources</entry>
     <entry key="RUN_ON_ALL">Run on all</entry>
+    <entry key="RUN_TYPE">Run Type</entry>
+    <entry key="RUN_SINGLE_INSTANCE">Run one instance</entry>
     <entry key="RUN_ON_ALL_AGENTS">Run on all agents</entry>
+    <entry key="RUN_MULTIPLE_INSTANCES">Run multiple instances</entry>
+    <entry key="RUN_MULTIPLE_INSTANCES_PREFIX">Run</entry>
+    <entry key="RUN_MULTIPLE_INSTANCES_SUFFIX">instances</entry>
     <entry key="TASKS">Tasks</entry>
     <entry key="TABS">Custom Tabs</entry>
     <entry key="TASK">Task</entry>
@@ -377,20 +390,19 @@
     <entry key="SSL_ENFORCED_BUT_BASE_NOT_FOUND">There is currently no 'https' URL configured. For this feature to work please configure the server's siteUrl or secureSiteUrl with an 'https' URL.</entry>
     <entry key="RELOAD">Reload</entry>
     <entry key="REFRESH_CONFIG">This will refresh the page and you will lose your changes on this page.</entry>
-    <entry key="NO_OAUTH_TOKEN_MESSAGE">There are no tokens.</entry>
     <entry key="MERCURIAL">Mercurial</entry>
     <entry key="SUBVERSION">Subversion</entry>
     <entry key="GIT">Git</entry>
     <entry key="PACKAGE">Package</entry>
     <entry key="REPOSITORY">Repository</entry>
+    <entry key="SCM">SCM</entry>
     <entry key="P4">Perforce</entry>
     <entry key="PERFORCE">Perforce</entry>
     <entry key="JOB_SETTINGS">Job Settings</entry>
     <entry key="ARTIFACTS">Artifacts</entry>
     <entry key="RELOAD">Reload</entry>
     <entry key="NO_OAUTH_TOKEN_MESSAGE">There are no tokens.</entry>
-    <entry key="RADIO_BUTTON_TITLE_APPROVAL">'On Success' option will automatically schedule the stage after the preceding stage completes successfully. The 'Manual' option will require a user to manually
-                                              trigger the stage. For the first stage in a pipeline, setting type to 'on success' is the same as checking 'Automatic Pipeline Scheduling' on the pipeline config.</entry>
+    <entry key="RADIO_BUTTON_TITLE_APPROVAL">'On Success' option will automatically schedule the stage after the preceding stage completes successfully. The 'Manual' option will require a user to manually trigger the stage. For the first stage in a pipeline, setting type to 'on success' is the same as checking 'Automatic Pipeline Scheduling' on the pipeline config.</entry>
     <entry key="YES">Yes</entry>
     <entry key="NO">No</entry>
     <entry key="TRIGGER_TYPE">Trigger Type</entry>
@@ -403,10 +415,11 @@
     <entry key="INSTRUCTION_JOB_TASK">This job requires at least one task. You can add more tasks once this job has been created</entry>
     <entry key="INSTRUCTION_TEST_ARTIFACT">Type</entry>
     <entry key="TOOLTIP_RESOURCES">Agent resources that this job requires to run</entry>
-    <entry key="TOOLTIP_TABS">Lets you add new tabs within the Job Details page. <![CDATA[<a class='' href='/go/help/dev_see_artifact_as_tab.html' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_TABS">Lets you add new tabs within the Job Details page. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/faq/dev_see_artifact_as_tab.html' target='_blank'>More...</a>]]></entry>
     <entry key="TOOLTIP_TAB_NAME">Name of the tab which will appear in the Job Detail Page.</entry>
     <entry key="TOOLTIP_TAB_PATH">The artifact that will be rendered in the custom tab. This is typically a html or xml file.</entry>
     <entry key="TOOLTIP_RUN_ON_ALL"> Job will run on all agents that match its resources (if any). If you’re using the Enterprise Edition, only agents in the same environment as this job’s pipeline will pick up the job. This option is particularly useful when deploying to multiple servers.</entry>
+    <entry key="TOOLTIP_RUN_MULTIPLE_INSTANCE"> Specified number of instances of job will be created during schedule time.</entry>
     <entry key="TOOLTIP_ARTIFACT_SOURCE">The file or folders to publish to the server. Go will only upload files that are in the working directory of the job. You can use wildcards to specify the files and folders to upload (** means any path, * means any file or folder name).</entry>
     <entry key="TOOLTIP_ARTIFACT_DESTINATION">The destination is relative to the artifacts folder of the current instance on the server side. If it is not specified, the artifact will be stored in the root of the artifacts directory</entry>
     <entry key="TOOLTIP_TEST_ARTIFACT">When 'Test Artifact' is selected, Go will use this artifact to generate a test report. Test information is placed in the Failures and Test sub-tabs. Test results from multiple jobs are aggregated on the stage detail pages. This allows you to see the results of tests from both functional and unit tests even if they are run in different jobs.</entry>
@@ -415,26 +428,26 @@
     <entry key="UNSAVED_CHANGES_WARNING_MESSAGE">There are unsaved changes on your form. 'Proceed' will discard these changes.</entry>
     <entry key="TOOLTIP_PIPELINE_LOCKING">If checked, only a single instance of the pipeline can be run at a time and the lock will release only if the entire pipeline completes successfully. This is particularly useful in deployment scenarios.</entry>
     <entry key="TOOLTIP_TRACKING_TOOL">Can be used to specify links to an issue tracker. Go will construct a link based on the commit message that you can use to take you to your tracking tool (Mingle card, JIRA issue, Trac issue etc).</entry>
-    <entry key="TOOLTIP_TRACKING_TOOL_REGEX">A regular expression to identify card or bug numbers from your checkin comments. <![CDATA[<a class='' href='/go/help/go_integration.html#tracking_tool' target='_blank'>More...</a>]]></entry>
-    <entry key="TOOLTIP_TRACKING_TOOL_URL">The URI to your tracking tool. This must contain the string ${ID} which will be replaced with the number identified using the pattern. <![CDATA[<a class='' href='/go/help/go_integration.html#tracking_tool' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_TRACKING_TOOL_REGEX">A regular expression to identify card or bug numbers from your checkin comments. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/integration/go_integration.html' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_TRACKING_TOOL_URL">The URI to your tracking tool. This must contain the string ${ID} which will be replaced with the number identified using the pattern. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/integration/go_integration.html' target='_blank'>More...</a>]]></entry>
     <entry key="TOOLTIP_MATERIAL_NAME">[Optional] The name of the material. If omitted, the default material name is the URL. You can override this by setting the material name explicitly.</entry>
-    <entry key="TOOLTIP_LABEL_TEMPLATE">Customize the label for this pipeline. <![CDATA[<a class='' href='/go/help/admin_use_custom_pipeline_label.html' target='_blank'>More...</a>]]></entry>
-    <entry key="TOOLTIP_CRON_TIMER_SPECIFICATION">A cron-like schedule to build the pipeline. For example to run a pipeline once every night at 10 pm on weekdays, use '0 0 22 ? * MON-FRI'. <![CDATA[<a href='/go/help/configuration_reference.html#timer' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_LABEL_TEMPLATE">Customize the label for this pipeline. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/configuration/admin_use_custom_pipeline_label.html' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_CRON_TIMER_SPECIFICATION">A cron-like schedule to build the pipeline. For example to run a pipeline once every night at 10 pm on weekdays, use '0 0 22 ? * MON-FRI'. <![CDATA[<a href='http://www.go.cd/documentation/user/current/configuration/configuration_reference.html#timer' target='_blank'>More...</a>]]></entry>
     <entry key="TOOLTIP_MINGLE_GADGET_CONFIGURATION">Associates a Mingle project to a pipeline. Doing so will allow you to track Mingle cards from within Go.</entry>
     <entry key="TOOLTIP_MINGLE_URL">Base URI to the Mingle installation (do not include the project name/identifier)</entry>
     <entry key="TOOLTIP_MINGLE_PROJECT_IDENTIFIER">In Mingle, the project 'Identfier' can be found under the project's 'Project admin' tab in the section titled 'Basic Information'.</entry>
     <entry key="TOOLTIP_MQL_GROUPING_CONDITIONS">A MQL string that determines the 'passing criteria' for cards displayed.</entry>
-    <entry key="TOOLTIP_ENVIRONMENT_VARIABLES">Environment variables defined here are set on the agents and can be used within your tasks. <![CDATA[<a class='' href='/go/help/dev_use_current_revision_in_build.html' target='_blank'>More...</a>]]></entry>
-    <entry key="TOOLTIP_PARAMETERS">Parameters help reduce repetition within your configurations and combined with templates allow you to setup complex configurations. <![CDATA[<a class='' href='/go/help/admin_use_parameters_in_configuration.html' target='_blank'>More...</a>]]> </entry>
+    <entry key="TOOLTIP_ENVIRONMENT_VARIABLES">Environment variables defined here are set on the agents and can be used within your tasks. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/faq/dev_use_current_revision_in_build.html' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_PARAMETERS">Parameters help reduce repetition within your configurations and combined with templates allow you to setup complex configurations. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/configuration/admin_use_parameters_in_configuration.html' target='_blank'>More...</a>]]> </entry>
     <entry key="TOOLTIP_COMPARE_WITH_PREVIOUS">Compare with the previous build</entry>
     <entry key="TOOLTIP_CANNOT_COMPARE_WHILE_BISECT">Cannot compare because it was manually triggered with a non-sequential revision</entry>
     <entry key="TOOLTIP_TASK_COMMAND">The command or script to be executed, relative to the working directory</entry>
     <entry key="EXEC_ARGUMENT_LIST_INSTRUCTION">Enter each argument on a new line</entry>
     <entry key="TOOLTIP_TASK_WORKING_DIRECTORY">The directory in which the script or command is to be executed. This is always relative to the directory where the agent checks out materials.</entry>
-    <entry key="TOOLTIP_ANT_BUILD_FILE">Path to Ant build file. If not specified, the path defaults to ‘build.xml’.</entry>
-    <entry key="TOOLTIP_ANT_TARGET">Ant target(s) to run. If not specified, the target defaults to ‘default’.</entry>
+    <entry key="TOOLTIP_ANT_BUILD_FILE">Path to Ant build file. If not specified, the path defaults to 'build.xml'.</entry>
+    <entry key="TOOLTIP_ANT_TARGET">Ant target(s) to run. If not specified, the target defaults to 'default'.</entry>
     <entry key="TOOLTIP_ANT_WORKING_DIRECTORY">The directory from where Ant is invoked</entry>
-    <entry key="TOOLTIP_NANT_BUILD_FILE">Relative path to a NAnt build file. If not specified, the path defaults to ‘default.build’.</entry>
+    <entry key="TOOLTIP_NANT_BUILD_FILE">Relative path to a NAnt build file. If not specified, the path defaults to 'default.build'.</entry>
     <entry key="TOOLTIP_NANT_TARGET">NAnt target(s) to run. If not specified, defaults to the default target of the build file.</entry>
     <entry key="TOOLTIP_NANT_WORKING_DIRECTORY">The directory from where NAnt is invoked.</entry>
     <entry key="TOOLTIP_NANT_NANT_PATH">Path of the directory in which NAnt is installed. By default Go will assume that NAnt is in the system path.</entry>
@@ -519,6 +532,7 @@
     <entry key="TRACKING_TOOL">Tracking Tool</entry>
     <entry key="MINGLE">Mingle</entry>
     <entry key="NONE">None</entry>
+    <entry key="FEATURE_NOT_AVAILABLE">'{0}' feature is turned off. Please turn it on to use it.</entry>
     <entry key="ENVIRONMENT_FEATURE_NOT_AVAILABLE">Environments is a Go Enterprise feature. Go is currently running in Community mode. &lt;a href=''{0}''&gt;Request an Enterprise license &lt;/a&gt;</entry>
     <entry key="TEMPLATES_FEATURE_NOT_AVAILABLE">Templates is a Go Enterprise feature. Go is currently running in Community mode. &lt;a href=''{0}''&gt;Request an Enterprise license &lt;/a&gt;</entry>
     <entry key="MULTIPLE_PIPELINE_GROUPS_FEATURE_NOT_AVAILABLE">Multiple Pipeline Groups is a Go Enterprise feature. Go is currently running in Community mode. &lt;a href=''{0}''&gt;Request an Enterprise license &lt;/a&gt;</entry>
@@ -541,7 +555,7 @@
     <entry key="CONFIGURATION_TYPE">Configuration Type</entry>
     <entry key="DEFINE_STAGES">Define Stages</entry>
     <entry key="USE_TEMPLATE">Use Template</entry>
-    <entry key="TOOLTIP_DEFINE_STAGES_DISABLED">Once a pipeline is associated with a template, it cannot be reverted to this mode via the UI. To disassociate this pipeline from a template, please configure it via the ‘Config XML’ tab from the Admin screen.</entry>
+    <entry key="TOOLTIP_DEFINE_STAGES_DISABLED">Once a pipeline is associated with a template, it cannot be reverted to this mode via the UI. To disassociate this pipeline from a template, please configure it via the 'Config XML' tab from the Admin screen.</entry>
     <entry key="SELECT_TEMPLATE">Template</entry>
     <entry key="CONFIRM_SAVE">Confirm Save</entry>
     <entry key="CONFIRM_DELETION">Confirm Deletion</entry>
@@ -563,7 +577,7 @@
     <entry key="REMOVE_THIS_MATERIAL">Remove this material</entry>
     <entry key="GLOBAL_ERRORS_MESSAGE">The following error(s) need to be resolved in order to perform this action:</entry>
     <entry key="REQUIRED_FIELD_MESSAGE"> indicates a required field</entry>
-    <entry key="WARNING_DESTINATION_DIRECTORY_NEEDED">In order to configure multiple materials for this pipeline, each of its material needs have to a ‘Destination Directory’ specified. Please edit the existing material and specify a ‘Destination Directory’ in order to proceed with this operation.</entry>
+    <entry key="WARNING_DESTINATION_DIRECTORY_NEEDED">In order to configure multiple materials for this pipeline, each of its material needs have to a 'Destination Directory' specified. Please edit the existing material and specify a 'Destination Directory' in order to proceed with this operation.</entry>
     <entry key="TAB_NAME">Tab Name</entry>
     <entry key="PATH">Path</entry>
     <entry key="STARTED_AT">Started At</entry>
@@ -626,10 +640,10 @@
     <entry key="NO_GRAPH_FOR_STAGE">The graph will be available once there is at least one passed or failed stage.</entry>
     <entry key="DOWNLOAD_AGENT">Download Agent</entry>
     <entry key="SITE_URL">Site URL</entry>
-    <entry key="TOOLTIP_SITE_URL">This entry will be used by Go Server to generate links for emails, feeds etc. Format: [protocol]://[host]:[port]. <![CDATA[<a class='' href='/go/help/configuring_server_details.html#configure_site_url' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_SITE_URL">This entry will be used by Go Server to generate links for emails, feeds etc. Format: [protocol]://[host]:[port]. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/installation/configuring_server_details.html#configure-site-urls' target='_blank'>More...</a>]]></entry>
     <entry key="SECURE_SITE_URL">Secure Site URL</entry>
-    <entry key="TOOLTIP_SECURE_SITE_URL">If you wish that your primary site URL be HTTP, but still want to have HTTPS endpoints for the features that require SSL, you can specify this attribute with a value of the base HTTPS URL. Format: https://[host]:[port]. <![CDATA[<a class='' href='/go/help/configuring_server_details.html#configure_site_url' target='_blank'>More...</a>]]></entry>
-    <entry key="FILTERS_HELP_LINK"><![CDATA[<a class='' href='/go/help/agents_page.html#filter_agents' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_SECURE_SITE_URL">If you wish that your primary site URL be HTTP, but still want to have HTTPS endpoints for the features that require SSL, you can specify this attribute with a value of the base HTTPS URL. Format: https://[host]:[port]. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/installation/configuring_server_details.html#configure-site-urls' target='_blank'>More...</a>]]></entry>
+    <entry key="FILTERS_HELP_LINK"><![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/navigation/agents_page.html#filtering-agents' target='_blank'>More...</a>]]></entry>
     <entry key="FILTER">Filter</entry>
     <entry key="CLEAR">Clear</entry>
     <entry key="LICENSE_ABOUT_EXPIRE_TITLE">Your Go license key will expire in {0} days.</entry>
@@ -651,7 +665,7 @@
     <entry key="TFS_PROJECT_PATH">Project Path</entry>
     <entry key="TFS">Team Foundation Server</entry>
     <entry key="UNAUTHORIZED_TO_BACKUP">Unauthorized to initiate Go backup as you are not a Go administrator</entry>
-    <entry key="TOOLTIP_ENCRYPTED_ENVIRONMENT_VARIABLES">Environment variables that are never displayed or logged in plain text. <![CDATA[<a class='' href='/go/help/dev_use_current_revision_in_build.html' target='_blank'>More...</a>]]></entry>
+    <entry key="TOOLTIP_ENCRYPTED_ENVIRONMENT_VARIABLES">Environment variables that are never displayed or logged in plain text. <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/faq/dev_use_current_revision_in_build.html' target='_blank'>More...</a>]]></entry>
     <entry key="USER_NOT_KNOWN">Your account is not known to the Go server.</entry>
     <entry key="USER_DISABLED">Your account has been disabled.</entry>
     <entry key="OVERRIDE_SECURE_ENVIRONMENT_AND_PIPELINE_LEVEL_VARIABLES">Override secure Environment and Pipeline level variables:</entry>
@@ -660,7 +674,7 @@
     <entry key="ARTIFACT_DIRECTORY_DISK_SPACE">Available disk space in backup directory:</entry>
     <entry key="BACKUP_HELP_HEADING">On performing a backup, Go will create a backup of:</entry>
     <entry key="BACKUP_HELP_CONFIG">Configuration - An archive named config-dir.zip containing XML configuration, Jetty server configuration, keystores and other Go internal configurations.</entry>
-    <entry key="BACKUP_HELP_DB">Database - An archive named db.zip containing a single database file named cruise.h2.db</entry>
+    <entry key="BACKUP_HELP_DB">Database - The database is archived to a file which could be used to restore Go's database.</entry>
     <entry key="BACKUP_HELP_CONFIG_REPOSITORY">XML Configuration Version Repository - An archive named config-repo.zip containing a Git repository of the XML configuration file.</entry>
     <entry key="BACKUP_HELP_VERSION">Go Version - A flat file named version.txt containing the version of Go that the backup was taken against.</entry>
     <entry key="PATH_FROM_ANCESTOR">Path from Ancestor</entry>
@@ -690,15 +704,18 @@
     <entry key="LABEL_COMMAND_REPOSITORY">Lookup Commands</entry>
     <entry key="COMMAND_LOOKUP_PLACEHOLDER_TEXT">Enter command name or keyword</entry>
     <entry key="COMMAND_REPO_LOCATION">Location</entry>
-    <entry key="TOOLTIP_COMMAND_REPOSITORY_LOCATION">Path to <![CDATA[<a class='' href='/go/help/command_repository.html' target='_blank'>command repository</a>]]> on Go Server. The location should be accessible to Go user.</entry>
+    <entry key="TOOLTIP_COMMAND_REPOSITORY_LOCATION">Path to <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/advanced_usage/command_repository.html' target='_blank'>command repository</a>]]> on Go Server. The location should be accessible to Go user.</entry>
     <entry key="INVALID_SNIPPETS">Invalid Commands</entry>
     <entry key="INVALID_SNIPPETS_FOUND">{0} invalid commands found.</entry>
-    <entry key="TOOLTIP_COMMAND_LOOKUP">Lookup sample command snippets from your local <![CDATA[<a class='' href='/go/help/command_repository.html' target='_blank'>command repository</a>]]>.</entry>
+    <entry key="TOOLTIP_COMMAND_LOOKUP">Lookup sample command snippets from your local <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/advanced_usage/command_repository.html' target='_blank'>command repository</a>]]>.</entry>
     <entry key="TOOLTIP_COMMAND_REPOSITORY_CACHE_RELOAD">Explicit reloading of the commands from the repository. Note: Changing the repository location above will automatically do this.</entry>
-    <entry key="MESSAGE_ABOUT_COMMAND_LOOKUP_DISABLED_DUE_TO_OLD_STYLE_ARGS">The lookup feature is only available for the <![CDATA[<a class='' href='/go/help/command_repository.html#args' target='_blank'>new style</a>]]> of custom commands.</entry>
+    <entry key="MESSAGE_ABOUT_COMMAND_LOOKUP_DISABLED_DUE_TO_OLD_STYLE_ARGS">The lookup feature is only available for the <![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/advanced_usage/command_repository.html#args-style-commands' target='_blank'>new style</a>]]> of custom commands.</entry>
     <entry key="RELOAD_COMMAND_REPO_CACHE">Reload cache</entry>
     <entry key="COMMAND_REPOSITORY_MANAGEMENT">Command Repository Management</entry>
     <entry key="PLUGINS_TAB">Plugins</entry>
+    <entry key="COMMAND_UPLOAD">Upload</entry>
+    <entry key="UPLOAD_PLUGIN">Upload Plugin</entry>
+    <entry key="PLUGIN_JAR">Plugin JAR</entry>
     <entry key="PACKAGE_REPOSITORY_TAB">Package Repositories</entry>
     <entry key="DEPLOY_SPECIFIC_REVISION">Deploy Specific Revision</entry>
     <entry key="TOOLTIP_FETCH_MATERIALS">Perform material updates or checkouts</entry>
@@ -723,21 +740,22 @@
     <entry key="YOUR_CHANGES">Your Changes</entry>
     <entry key="LAST_MODIFIED">Last modified</entry>
     <entry key="AGO">ago</entry>
-    <entry key="HELP_LINK_CONFIGURATION_REFERENCE"><![CDATA[<a class='' href='/go/help/configuration_reference.html' target='_blank'>Help Topic: Configuration</a>]]></entry>
+    <entry key="HELP_LINK_CONFIGURATION_REFERENCE"><![CDATA[<a class='' href='http://www.go.cd/documentation/user/current/configuration/configuration_reference.html' target='_blank'>Help Topic: Configuration</a>]]></entry>
     <entry key="VSM_PIPELINE_DELETED">Pipeline has been deleted</entry>
     <entry key="VSM_PIPELINE_UNAUTHORIZED">You are not authorized to view this pipeline</entry>
-    <entry key="VSM_UNSUPPORTED_ON_IE8"><![CDATA[Your browser is not supported. Please either upgrade your browser or use a different browser to view <a href='/go/help/value_stream_map.html' target='_blank'>Value Stream Map</a>.]]></entry>
+    <entry key="VSM_UNSUPPORTED_ON_IE8"><![CDATA[Your browser is not supported. Please either upgrade your browser or use a different browser to view <a href='http://www.go.cd/documentation/user/current/navigation/value_stream_map.html' target='_blank'>Value Stream Map</a>.]]></entry>
     <entry key="VSM_CYCLIC_DEPENDENCY">Value Stream Map of Pipeline ''{0}'' with counter ''{1}'' can not be rendered. Changes to the configuration have introduced complex dependencies for this instance which are not supported currently.</entry>
     <entry key="VSM_INTERNAL_SERVER_ERROR">Value Stream Map of pipeline ''{0}'' with counter ''{1}'' can not be rendered. Please check the server log for details.</entry>
+    <entry key="VSM_INTERNAL_SERVER_ERROR_FOR_MATERIAL">Value Stream Map of material with fingerprint ''{0}'' with revision ''{1}'' can not be rendered. Please check the server log for details.</entry>
     <entry key="USER_DELETE_SUCCESSFUL">User ''{0}'' was deleted successfully.</entry>
     <entry key="USER_NOT_FOUND">User ''{0}'' not found.</entry>
     <entry key="USER_NOT_DISABLED">User ''{0}'' is not disabled.</entry>
-    <entry key="POSTGRESQL_BACKUP_WARNING">When postgreSQL is used, this operation will not perform a database backup. We recommend taking a manual backup of the database as needed.</entry>
     <entry key="VIEW">View</entry>
     <entry key="ADD_NEW_REPOSITORY">Add New Repository</entry>
     <entry key="MANDATORY_CONFIGURATION_FIELD">This field is required</entry>
     <entry key="PLUGIN_ID_REQUIRED">Please select package repository plugin</entry>
     <entry key="PLUGIN_ID_INVALID">Invalid plugin id</entry>
+    <entry key="INSTALLED_PLUGINS">Installed Plugins</entry>
     <entry key="NO_PLUGINS_INSTALLED">No plugins found. To configure a package repository you must have plugin(s) installed.</entry>
     <entry key="NO_PLUGINS_FOUND">No plugins found. Please drop your plugin here at this location: </entry>
     <entry key="NO_ARTIFACTS_CONFIGURED">No artifacts have been configured</entry>
@@ -746,7 +764,7 @@
     <entry key="CURRENT_PIPELINE">Current pipeline</entry>
     <entry key="NO_TASKS_CONFIGURED">No tasks have been configured</entry>
     <entry key="ASSOCIATED_PLUGIN_NOT_FOUND">Associated plugin ''{0}'' not found. Please contact the Go admin to install the plugin.</entry>
-	<entry key="ASSOCIATED_PLUGIN_NOT_FOUND_SAVE">On Cancel task is not available because associated plugin ''{0}'' is missing. Please contact Go admin to verify or re-install plugin. Click on ‘Save’ will replace the current On Cancel task.</entry>
+	<entry key="ASSOCIATED_PLUGIN_NOT_FOUND_SAVE">On Cancel task is not available because associated plugin ''{0}'' is missing. Please contact Go admin to verify or re-install plugin. Click on 'Save' will replace the current On Cancel task.</entry>
 	<entry key="NEW_GLOBAL_PACKAGE_WARNING">The new package will be available to be used as material in all pipelines. Other admins might be able to edit this package.</entry>
     <entry key="PACKAGE_REPOSITORY_NOT_FOUND">Could not find the repository with id ''{0}''. It might have been deleted.</entry>
     <entry key="CONNECTION_OK">Connection OK. {0}</entry>
@@ -773,4 +791,6 @@
     <entry key="APACHE_LICENSE_2_0">Apache License, Version 2.0</entry>
     <entry key="THIRD_PARTY_SOFTWARE">third-party software</entry>
     <entry key="GARAGE_MESSAGE">{0}</entry>
+    <entry key="GLOBAL_SCM_WARNING">This is a global copy. All pipelines using this SCM will be affected.</entry>
+    <entry key="SCM_USED_IN_PIPELINES_LINK">Show pipelines using this SCM</entry>
 </properties>

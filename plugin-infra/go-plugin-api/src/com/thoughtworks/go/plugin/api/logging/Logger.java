@@ -16,15 +16,15 @@
 
 package com.thoughtworks.go.plugin.api.logging;
 
-import java.lang.reflect.Field;
-
 import com.thoughtworks.go.plugin.internal.api.LoggingService;
 
+import java.lang.reflect.Field;
+
 /**
- * Logger for use by the plugin developers.
+ * Logger for use by plugin developers.
  *
  * @author Go Team
- * @see <a href="http://www.thoughtworks-studios.com/docs/go/current/help/go_plugins_basics.html" target="_blank">Go Plugin Documentation</a>
+ * @see <a href="http://www.go.cd/documentation/developer/writing_go_plugins/go_plugins_basics.html" target="_blank">Go Plugin Documentation</a>
  */
 public class Logger {
     private String pluginId;
@@ -67,6 +67,20 @@ public class Logger {
     }
 
     /**
+     * Messages to be logged in debug mode.
+     *
+     * @param message a string containing the message to be logged.
+     * @param throwable
+     */
+    public void debug(String message, Throwable throwable) {
+        if (loggingService == null) {
+            System.out.println(message);
+            return;
+        }
+        loggingService.debug(pluginId, loggerName, message, throwable);
+    }
+
+    /**
      * Messages to be logged in info mode.
      *
      * @param message a string containing the message to be logged.
@@ -77,6 +91,20 @@ public class Logger {
             return;
         }
         loggingService.info(pluginId, loggerName, message);
+    }
+
+    /**
+     * Messages to be logged in info mode.
+     *
+     * @param message a string containing the message to be logged.
+     * @param throwable
+     */
+    public void info(String message, Throwable throwable) {
+        if (loggingService == null) {
+            System.out.println(message);
+            return;
+        }
+        loggingService.info(pluginId, loggerName, message, throwable);
     }
 
     /**
@@ -93,6 +121,20 @@ public class Logger {
     }
 
     /**
+     * Messages to be logged in warn mode.
+     *
+     * @param message a string containing the message to be logged.
+     * @param throwable
+     */
+    public void warn(String message, Throwable throwable) {
+        if (loggingService == null) {
+            System.err.println(message);
+            return;
+        }
+        loggingService.warn(pluginId, loggerName, message, throwable);
+    }
+
+    /**
      * Messages to be logged in error mode.
      *
      * @param message a string containing the message to be logged.
@@ -103,6 +145,20 @@ public class Logger {
             return;
         }
         loggingService.error(pluginId, loggerName, message);
+    }
+
+    /**
+     * Messages to be logged in error mode.
+     *
+     * @param message a string containing the message to be logged.
+     * @param throwable
+     */
+    public void error(String message, Throwable throwable) {
+        if (loggingService == null) {
+            System.err.println(message);
+            return;
+        }
+        loggingService.error(pluginId, loggerName, message, throwable);
     }
 
     private static Object getStaticField(Class kls, String name) {

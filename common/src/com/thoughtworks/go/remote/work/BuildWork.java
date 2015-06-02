@@ -16,16 +16,13 @@
 
 package com.thoughtworks.go.remote.work;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.SocketTimeoutException;
-import java.util.Date;
-import java.util.List;
-
 import com.thoughtworks.go.config.ArtifactPropertiesGenerator;
+import com.thoughtworks.go.config.RunIfConfig;
 import com.thoughtworks.go.domain.*;
-import com.thoughtworks.go.domain.GoControlLog;
 import com.thoughtworks.go.domain.materials.MaterialAgentFactory;
+import com.thoughtworks.go.plugin.access.packagematerial.PackageAsRepositoryExtension;
+import com.thoughtworks.go.plugin.access.pluggabletask.TaskExtension;
+import com.thoughtworks.go.plugin.access.scm.SCMExtension;
 import com.thoughtworks.go.publishers.GoArtifactsManipulator;
 import com.thoughtworks.go.remote.AgentIdentifier;
 import com.thoughtworks.go.remote.BuildRepositoryRemote;
@@ -42,8 +39,16 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jdom.Element;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+
 import static com.thoughtworks.go.util.ExceptionUtils.bomb;
 import static com.thoughtworks.go.util.ExceptionUtils.messageOf;
+import static java.lang.String.format;
 
 public class BuildWork implements Work {
     private static final Log LOGGER = LogFactory.getLog(BuildWork.class);
@@ -64,7 +69,7 @@ public class BuildWork implements Work {
     }
 
     private void initialize(BuildRepositoryRemote remoteBuildRepository,
-                            GoArtifactsManipulator goArtifactsManipulator, AgentRuntimeInfo agentRuntimeInfo) {
+                            GoArtifactsManipulator goArtifactsManipulator, AgentRuntimeInfo agentRuntimeInfo, TaskExtension taskExtension) {
         plan = assignment.getPlan();
         agentRuntimeInfo.busy(new AgentBuildingInfo(plan.getIdentifier().buildLocatorForDisplay(),
                 plan.getIdentifier().buildLocator()));
@@ -74,17 +79,16 @@ public class BuildWork implements Work {
         goPublisher = new DefaultGoPublisher(goArtifactsManipulator, plan.getIdentifier(),
                 remoteBuildRepository, agentRuntimeInfo);
 
-        builders = new Builders(assignment.getBuilders(), goPublisher, buildLog);
+        builders = new Builders(assignment.getBuilders(), goPublisher, buildLog, taskExtension);
     }
 
-    public void doWork(AgentIdentifier agentIdentifier,
-                       BuildRepositoryRemote remoteBuildRepository,
-                       GoArtifactsManipulator goArtifactsManipulator, EnvironmentVariableContext environmentVariableContext,
-                       AgentRuntimeInfo agentRuntimeInfo) {
-        initialize(remoteBuildRepository, goArtifactsManipulator, agentRuntimeInfo);
+    public void doWork(AgentIdentifier agentIdentifier, BuildRepositoryRemote remoteBuildRepository, GoArtifactsManipulator goArtifactsManipulator,
+                       EnvironmentVariableContext environmentVariableContext, AgentRuntimeInfo agentRuntimeInfo,
+                       PackageAsRepositoryExtension packageAsRepositoryExtension, SCMExtension scmExtension, TaskExtension taskExtension) {
+        initialize(remoteBuildRepository, goArtifactsManipulator, agentRuntimeInfo, taskExtension);
         environmentVariableContext.addAll(assignment.initialEnvironmentVariableContext());
         try {
-            JobResult result = build(environmentVariableContext, agentIdentifier);
+            JobResult result = build(environmentVariableContext, agentIdentifier, packageAsRepositoryExtension, scmExtension);
             reportCompletion(result);
         } catch (InvalidAgentException e) {
             LOGGER.error("Agent UUID changed in the middle of the build.", e);
@@ -100,7 +104,7 @@ public class BuildWork implements Work {
             goPublisher.reportErrorMessage(messageOf(e), e);
         }
         catch (Exception reportException) {
-            LOGGER.error(String.format("Unable to report error message - %s.", messageOf(e)), reportException);
+            LOGGER.error(format("Unable to report error message - %s.", messageOf(e)), reportException);
         }
         reportCompletion(JobResult.Failed);
     }
@@ -115,18 +119,21 @@ public class BuildWork implements Work {
                 goPublisher.reportCompleted(result);
             }
         } catch (Exception ex) {
-            LOGGER.error("New error occured during error handling:\n"
+            LOGGER.error("New error occurred during error handling:\n"
                     + "build will be rescheduled when agent starts asking for work again", ex);
         }
     }
 
-    private JobResult build(EnvironmentVariableContext environmentVariableContext, AgentIdentifier agentIdentifier) throws Exception {
+    private JobResult build(EnvironmentVariableContext environmentVariableContext, AgentIdentifier agentIdentifier,
+                            PackageAsRepositoryExtension packageAsRepositoryExtension, SCMExtension scmExtension) throws Exception {
         if (this.goPublisher.isIgnored()) {
             this.goPublisher.reportAction("Job is cancelled");
             return null;
         }
 
-        prepareJob(agentIdentifier);
+        goPublisher.consumeLineWithPrefix(format("Job Started: %s\n", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z").format(timeProvider.currentTime())));
+
+        prepareJob(agentIdentifier, packageAsRepositoryExtension, scmExtension);
         setupEnvrionmentContext(environmentVariableContext);
         plan.applyTo(environmentVariableContext);
 
@@ -136,11 +143,11 @@ public class BuildWork implements Work {
         }
 
         JobResult result = buildJob(environmentVariableContext);
-        completeJob();
+        completeJob(result);
         return result;
     }
 
-    private void prepareJob(AgentIdentifier agentIdentifier) {
+    private void prepareJob(AgentIdentifier agentIdentifier, PackageAsRepositoryExtension packageAsRepositoryExtension, SCMExtension scmExtension) {
         goPublisher.reportAction("Start to prepare");
         goPublisher.reportCurrentStatus(JobState.Preparing);
 
@@ -151,9 +158,11 @@ public class BuildWork implements Work {
         }
 
         ProcessOutputStreamConsumer<GoPublisher, GoPublisher> consumer = new ProcessOutputStreamConsumer<GoPublisher, GoPublisher>(goPublisher, goPublisher);
-        MaterialAgentFactory materialAgentFactory = new MaterialAgentFactory(consumer, workingDirectory, agentIdentifier);
+        MaterialAgentFactory materialAgentFactory = new MaterialAgentFactory(consumer, workingDirectory, agentIdentifier, packageAsRepositoryExtension, scmExtension);
 
         materialRevisions.getMaterials().cleanUp(workingDirectory, consumer);
+
+        goPublisher.consumeLineWithPrefix("Start to update materials.\n");
 
         for (MaterialRevision revision : materialRevisions.getRevisions()) {
             materialAgentFactory.createAgent(revision).prepare();
@@ -161,7 +170,7 @@ public class BuildWork implements Work {
     }
 
     private EnvironmentVariableContext setupEnvrionmentContext(EnvironmentVariableContext context) {
-        context.setProperty("GO_SERVER_URL", SystemEnvironment.getProperty("serviceUrl"), false);
+        context.setProperty("GO_SERVER_URL", new SystemEnvironment().getPropertyImpl("serviceUrl"), false);
         context.setProperty("GO_TRIGGER_USER", assignment.getBuildApprover() , false);
         plan.getIdentifier().populateEnvironmentVariables(context);
         materialRevisions.populateEnvironmentVariables(context, workingDirectory);
@@ -174,10 +183,12 @@ public class BuildWork implements Work {
         return execute(environmentVariableContext);
     }
 
-    private void completeJob() throws SocketTimeoutException {
+    private void completeJob(JobResult result) throws SocketTimeoutException {
         if (goPublisher.isIgnored()) {
             return;
         }
+
+        goPublisher.consumeLineWithPrefix(format("Current job status: %s.\n", RunIfConfig.fromJobResult(result.toLowerCase())));
 
         goPublisher.reportCurrentStatus(JobState.Completing);
         goPublisher.reportAction("Start to create properties");
@@ -278,7 +289,7 @@ public class BuildWork implements Work {
                 FileUtils.cleanDirectory(buildWorkingDirectory);
                 goPublisher.consumeLineWithPrefix("Cleaning working directory \"" + buildWorkingDirectory.getAbsolutePath() + "\" since stage is configured to clean working directory");
             } catch (IOException e) {
-                bomb("Clean working directory is set to true. Unable to clean working directory for agent: " + buildWorkingDirectory.getAbsolutePath());
+                bomb("Clean working directory is set to true. Unable to clean working directory for agent: " + buildWorkingDirectory.getAbsolutePath() + ", with error: " + e.getMessage());
             }
         }
         if (!buildWorkingDirectory.exists()) {

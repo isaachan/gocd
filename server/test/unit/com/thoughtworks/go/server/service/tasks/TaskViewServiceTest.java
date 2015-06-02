@@ -37,6 +37,7 @@ import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginDescriptor;
 import com.thoughtworks.go.plugins.presentation.PluggableViewModel;
 import com.thoughtworks.go.plugins.presentation.Renderer;
 import com.thoughtworks.go.presentation.TaskViewModel;
+import com.thoughtworks.go.util.ReflectionUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Set;
 
 import static com.thoughtworks.go.domain.packagerepository.ConfigurationPropertyMother.create;
+import static com.thoughtworks.go.util.DataStructureUtils.s;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNull;
 import static org.hamcrest.CoreMatchers.hasItem;
@@ -96,12 +98,12 @@ public class TaskViewServiceTest {
         assertThat(taskViewModels, hasItem((PluggableViewModel) new TaskViewModel(new ExecTask(), "", Renderer.ERB)));
     }
 
-    private void storeTaskPreferences(String pluginId, String... properties){
+    private void storeTaskPreferences(String pluginId, String... properties) {
         FakeTask task = new FakeTask(properties);
         PluggableTaskConfigStore.store().setPreferenceFor(pluginId, new TaskPreference(task));
     }
 
-    private void storeTaskPreferences(String pluginId, Property... properties){
+    private void storeTaskPreferences(String pluginId, Property... properties) {
         FakeTask task = new FakeTask(properties);
         PluggableTaskConfigStore.store().setPreferenceFor(pluginId, new TaskPreference(task));
     }
@@ -141,9 +143,9 @@ public class TaskViewServiceTest {
     public void shouldStoreDefaultValuesGivenForPropertiesInAPluginWhenInitializingANewTaskPlugin() throws Exception {
         String plugin = "task-plugin";
         when(pluginManager.getPluginDescriptorFor(plugin)).thenReturn(new GoPluginDescriptor(plugin, "1", null, null, null, false));
-        Property taskConfigProperty1 = new Property("key1");
-        Property taskConfigProperty2 = new Property("key2");
-        Property taskConfigProperty3 = new Property("key3");
+        Property taskConfigProperty1 = new TaskConfigProperty("key1", null);
+        Property taskConfigProperty2 = new TaskConfigProperty("key2", null);
+        Property taskConfigProperty3 = new TaskConfigProperty("key3", null);
         storeTaskPreferences(plugin, taskConfigProperty1.withDefault("default1"), taskConfigProperty2.withDefault("default2"), taskConfigProperty3);
         when(registry.implementersOf(Task.class)).thenReturn(Arrays.<Class<? extends Task>>asList(PluggableTask.class));
 
@@ -246,6 +248,24 @@ public class TaskViewServiceTest {
         assertThat(viewModels.contains(viewModel(ant)), is(true));
         assertThat(viewModels.contains(viewModel(fetch)), is(true));
         assertThat(viewModels.contains(viewModel(given)), is(true));
+    }
+
+    @Test
+    public void shouldNotThrowNullPointerExceptionWhenPluginDescriptorOrTaskPreferenceBecomesNullDueToRaceCondition() throws Exception {
+        PluggableTaskConfigStore pluggableTaskConfigStore = mock(PluggableTaskConfigStore.class);
+        Object original = ReflectionUtil.getStaticField(PluggableTaskConfigStore.class, "PLUGGABLE_TASK_CONFIG_STORE");
+        try {
+            ReflectionUtil.setStaticField(PluggableTaskConfigStore.class, "PLUGGABLE_TASK_CONFIG_STORE", pluggableTaskConfigStore);
+
+            String pluginId = "some.plugin.id";
+            when(pluggableTaskConfigStore.pluginsWithPreference()).thenReturn(s(pluginId));
+            when(pluginManager.getPluginDescriptorFor(pluginId)).thenReturn(null);
+
+            TaskViewService taskViewService = new TaskViewService(registry, pluginManager);
+            taskViewService.getTaskViewModelsWith(mock(Task.class));
+        } finally {
+            ReflectionUtil.setStaticField(PluggableTaskConfigStore.class, "PLUGGABLE_TASK_CONFIG_STORE", original);
+        }
     }
 
     private List<Class<? extends Task>> taskImplementations() {

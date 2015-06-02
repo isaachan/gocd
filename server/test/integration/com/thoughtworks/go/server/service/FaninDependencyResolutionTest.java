@@ -16,16 +16,11 @@
 
 package com.thoughtworks.go.server.service;
 
-import java.io.File;
-
 import com.rits.cloning.Cloner;
 import com.thoughtworks.go.config.CaseInsensitiveString;
 import com.thoughtworks.go.config.CruiseConfig;
 import com.thoughtworks.go.config.GoConfigFileDao;
-import com.thoughtworks.go.config.materials.Filter;
-import com.thoughtworks.go.config.materials.IgnoredFiles;
-import com.thoughtworks.go.config.materials.PackageMaterial;
-import com.thoughtworks.go.config.materials.PackageMaterialConfig;
+import com.thoughtworks.go.config.materials.*;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
 import com.thoughtworks.go.config.materials.git.GitMaterial;
 import com.thoughtworks.go.config.materials.mercurial.HgMaterial;
@@ -55,10 +50,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import java.io.File;
+
 import static com.thoughtworks.go.util.SystemEnvironment.RESOLVE_FANIN_MAX_BACK_TRACK_LIMIT;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {
         "classpath:WEB-INF/applicationContext-global.xml",
@@ -68,17 +66,28 @@ import static org.junit.Assert.fail;
 public class FaninDependencyResolutionTest {
     public static final String STAGE_NAME = "s";
     public static final Cloner CLONER = new Cloner();
-    @Autowired private DatabaseAccessHelper dbHelper;
-    @Autowired private GoCache goCache;
-    @Autowired private GoConfigFileDao goConfigFileDao;
-    @Autowired private PipelineService pipelineService;
-    @Autowired private MaterialRepository materialRepository;
-    @Autowired private TransactionTemplate transactionTemplate;
-    @Autowired private GoConfigService goConfigService;
-    @Autowired private SystemEnvironment systemEnvironment;
-    @Autowired private MaterialChecker materialChecker;
-    @Autowired private PipelineTimeline pipelineTimeline;
-    @Autowired private ServerHealthService serverHealthService;
+    @Autowired
+    private DatabaseAccessHelper dbHelper;
+    @Autowired
+    private GoCache goCache;
+    @Autowired
+    private GoConfigFileDao goConfigFileDao;
+    @Autowired
+    private PipelineService pipelineService;
+    @Autowired
+    private MaterialRepository materialRepository;
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+    @Autowired
+    private GoConfigService goConfigService;
+    @Autowired
+    private SystemEnvironment systemEnvironment;
+    @Autowired
+    private MaterialChecker materialChecker;
+    @Autowired
+    private PipelineTimeline pipelineTimeline;
+    @Autowired
+    private ServerHealthService serverHealthService;
 
     private GoConfigFileHelper configHelper = new GoConfigFileHelper();
     private ScheduleTestUtil u;
@@ -106,6 +115,44 @@ public class FaninDependencyResolutionTest {
 
     private Integer maxBackTrackLimit() {
         return systemEnvironment.get(SystemEnvironment.RESOLVE_FANIN_MAX_BACK_TRACK_LIMIT);
+    }
+
+    @Test
+    public void shouldRestoreMaterialNamesBasedOnMaterialConfig() throws Exception {
+        /*
+            g -> up   -> down
+                 +-> mid -+
+         */
+
+        GitMaterial git = u.wf(new GitMaterial("git"), "folder1");
+        u.checkinInOrder(git, "g1");
+
+        ScheduleTestUtil.AddedPipeline up = u.saveConfigWith("up", u.m(git));
+        ScheduleTestUtil.MaterialDeclaration upForMid = u.m(up);
+        ((DependencyMaterial) upForMid.material).setName(new CaseInsensitiveString("up-for-mid"));
+        ScheduleTestUtil.AddedPipeline mid = u.saveConfigWith("mid", upForMid);
+        ScheduleTestUtil.MaterialDeclaration upForDown = u.m(up);
+        ((DependencyMaterial) upForDown.material).setName(new CaseInsensitiveString("up-for-down"));
+        ScheduleTestUtil.AddedPipeline down = u.saveConfigWith("down", u.m(mid), upForDown);
+        CruiseConfig cruiseConfig = goConfigFileDao.load();
+
+        String up_1 = u.runAndPass(up, "g1");
+        String mid_1 = u.runAndPass(mid, up_1);
+        String down_1 = u.runAndPass(down, mid_1, up_1);
+
+        MaterialRevisions given = u.mrs(
+                u.mr(mid, false, mid_1),
+                u.mr(up, false, up_1));
+
+        MaterialRevisions revisionsBasedOnDependencies = getRevisionsBasedOnDependencies(down, cruiseConfig, given);
+
+        for (MaterialRevision revisionsBasedOnDependency : revisionsBasedOnDependencies) {
+            DependencyMaterial dependencyPipeline = (DependencyMaterial) revisionsBasedOnDependency.getMaterial();
+            if (dependencyPipeline.getPipelineName().equals(new CaseInsensitiveString("up"))) {
+                assertThat(dependencyPipeline.getName(), is(new CaseInsensitiveString("up-for-down")));
+            }
+        }
+        assertThat(revisionsBasedOnDependencies, is(given));
     }
 
     @Test
@@ -876,7 +923,7 @@ public class FaninDependencyResolutionTest {
     }
 
     @Test
-    public void shouldResolveTriangleDependencyWithPackageMaterial(){
+    public void shouldResolveTriangleDependencyWithPackageMaterial() {
         /*
             +---> P1 ---+
             |           v
@@ -906,7 +953,7 @@ public class FaninDependencyResolutionTest {
     }
 
     @Test
-    public void shouldResolveDiamondDependencyWithPackageMaterial(){
+    public void shouldResolveDiamondDependencyWithPackageMaterial() {
         /*
             +---> P1 ---+
             |           v
@@ -927,6 +974,40 @@ public class FaninDependencyResolutionTest {
         String p1_1 = u.runAndPassWithGivenMDUTimestampAndRevisionStrings(p1, u.d(i++), "pkg1-1");
         String p2_1 = u.runAndPassWithGivenMDUTimestampAndRevisionStrings(p2, u.d(i++), "pkg1-1");
         String p2_2 = u.runAndPassWithGivenMDUTimestampAndRevisionStrings(p2, u.d(i++), "pkg1-2");
+
+        MaterialRevisions given = u.mrs(
+                u.mr(p1, true, p1_1),
+                u.mr(p2, true, p2_2));
+
+        MaterialRevisions expected = u.mrs(
+                u.mr(p1, true, p1_1),
+                u.mr(p2, true, p2_1));
+
+        assertThat(getRevisionsBasedOnDependencies(p3, goConfigFileDao.load(), given), is(expected));
+    }
+
+    @Test
+    public void shouldResolveDiamondDependencyWithPluggableSCMMaterial() {
+        /*
+            +---> P1 ---+
+            |           v
+           scm1         P3
+            |           ^
+            +--> P2 ----+
+        */
+        int i = 1;
+        PluggableSCMMaterial pluggableSCMMaterial = MaterialsMother.pluggableSCMMaterial();
+        u.addSCMConfig(pluggableSCMMaterial.getScmConfig());
+        String[] pkg_revs = {"scm1-1", "scm1-2"};
+        u.checkinInOrder(pluggableSCMMaterial, u.d(i++), pkg_revs);
+
+        ScheduleTestUtil.AddedPipeline p1 = u.saveConfigWith("p1", u.m(pluggableSCMMaterial));
+        ScheduleTestUtil.AddedPipeline p2 = u.saveConfigWith("p2", u.m(pluggableSCMMaterial));
+        ScheduleTestUtil.AddedPipeline p3 = u.saveConfigWith("p3", u.m(p1), u.m(p2));
+
+        String p1_1 = u.runAndPassWithGivenMDUTimestampAndRevisionStrings(p1, u.d(i++), "scm1-1");
+        String p2_1 = u.runAndPassWithGivenMDUTimestampAndRevisionStrings(p2, u.d(i++), "scm1-1");
+        String p2_2 = u.runAndPassWithGivenMDUTimestampAndRevisionStrings(p2, u.d(i++), "scm1-2");
 
         MaterialRevisions given = u.mrs(
                 u.mr(p1, true, p1_1),

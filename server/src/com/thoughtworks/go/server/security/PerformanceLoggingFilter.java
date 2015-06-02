@@ -16,25 +16,29 @@
 
 package com.thoughtworks.go.server.security;
 
-import java.io.IOException;
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
+import com.thoughtworks.go.server.perf.WebRequestPerformanceLogger;
+import com.thoughtworks.go.server.util.*;
+import com.thoughtworks.go.util.SystemEnvironment;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import javax.servlet.*;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import com.thoughtworks.go.util.SystemEnvironment;
+import java.io.IOException;
 
 public class PerformanceLoggingFilter implements Filter {
     private static final Log LOGGER = LogFactory.getLog(PerformanceLoggingFilter.class);
+    private final boolean usingJetty9;
     private boolean logRequestTimings;
+    private WebRequestPerformanceLogger webRequestPerformanceLogger;
 
-    public PerformanceLoggingFilter() {
-        logRequestTimings = new SystemEnvironment().getEnableRequestTimeLogging();
+    public PerformanceLoggingFilter(WebRequestPerformanceLogger webRequestPerformanceLogger) {
+        this.webRequestPerformanceLogger = webRequestPerformanceLogger;
+        SystemEnvironment systemEnvironment = new SystemEnvironment();
+        logRequestTimings = systemEnvironment.getEnableRequestTimeLogging();
+        usingJetty9 = systemEnvironment.usingJetty9();
     }
 
     public void init(FilterConfig filterConfig) throws ServletException {
@@ -45,11 +49,21 @@ public class PerformanceLoggingFilter implements Filter {
         try {
             filterChain.doFilter(servletRequest, servletResponse);
         } finally {
-            if (logRequestTimings)
-                LOGGER.warn(((HttpServletRequest) servletRequest).getRequestURI() + " took: " + (System.currentTimeMillis() - start) + " ms");
-        }
+            if (logRequestTimings) {
+                long amountOfTimeItTookInMilliseconds = System.currentTimeMillis() - start;
+                String requestURI = ((HttpServletRequest) servletRequest).getRequestURI();
+                String requestor = servletRequest.getRemoteAddr();
 
+                com.thoughtworks.go.server.util.ServletResponse response = ServletHelper.getInstance().getResponse(servletResponse);
+                int status = response.getStatus();
+                long contentCount = response.getContentCount();
+
+                webRequestPerformanceLogger.logRequest(requestURI, requestor, status, contentCount, amountOfTimeItTookInMilliseconds);
+                LOGGER.warn(requestURI + " took: " + amountOfTimeItTookInMilliseconds + " ms");
+            }
+        }
     }
+
 
     public void destroy() {
     }

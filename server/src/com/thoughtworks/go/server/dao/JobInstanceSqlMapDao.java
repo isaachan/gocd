@@ -16,11 +16,6 @@
 
 package com.thoughtworks.go.server.dao;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.ibatis.sqlmap.client.SqlMapClient;
 import com.opensymphony.oscache.base.Cache;
 import com.rits.cloning.Cloner;
@@ -28,14 +23,12 @@ import com.thoughtworks.go.config.ArtifactPlan;
 import com.thoughtworks.go.config.ArtifactPropertiesGenerator;
 import com.thoughtworks.go.config.Resource;
 import com.thoughtworks.go.database.Database;
-import com.thoughtworks.go.domain.JobIdentifier;
-import com.thoughtworks.go.domain.JobInstance;
-import com.thoughtworks.go.domain.JobInstances;
-import com.thoughtworks.go.domain.JobPlan;
-import com.thoughtworks.go.domain.JobState;
-import com.thoughtworks.go.domain.JobStateTransition;
-import com.thoughtworks.go.domain.StageIdentifier;
+import com.thoughtworks.go.domain.*;
 import com.thoughtworks.go.server.cache.GoCache;
+import com.thoughtworks.go.server.domain.JobStatusListener;
+import com.thoughtworks.go.server.persistence.ArtifactPlanRepository;
+import com.thoughtworks.go.server.persistence.ArtifactPropertiesGeneratorRepository;
+import com.thoughtworks.go.server.persistence.ResourceRepository;
 import com.thoughtworks.go.server.service.JobInstanceService;
 import com.thoughtworks.go.server.transaction.SqlMapClientDaoSupport;
 import com.thoughtworks.go.server.transaction.TransactionSynchronizationManager;
@@ -52,11 +45,16 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import static com.thoughtworks.go.util.IBatisUtil.arguments;
 
 @SuppressWarnings("unchecked")
 @Component
-public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobInstanceDao {
+public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobInstanceDao, JobStatusListener {
     private static final Logger LOG = Logger.getLogger(JobInstanceSqlMapDao.class);
     private Cache cache;
     private TransactionSynchronizationManager transactionSynchronizationManager;
@@ -64,16 +62,23 @@ public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobI
     private TransactionTemplate transactionTemplate;
     private EnvironmentVariableDao environmentVariableDao;
     private Cloner cloner = new Cloner();
+    private ResourceRepository resourceRepository;
+    private ArtifactPlanRepository artifactPlanRepository;
+    private ArtifactPropertiesGeneratorRepository artifactPropertiesGeneratorRepository;
 
     @Autowired
     public JobInstanceSqlMapDao(EnvironmentVariableDao environmentVariableDao, GoCache goCache, TransactionTemplate transactionTemplate, SqlMapClient sqlMapClient, Cache cache,
-                                TransactionSynchronizationManager transactionSynchronizationManager, SystemEnvironment systemEnvironment, Database database) {
+                                TransactionSynchronizationManager transactionSynchronizationManager, SystemEnvironment systemEnvironment, Database database,
+                                ResourceRepository resourceRepository, ArtifactPlanRepository artifactPlanRepository, ArtifactPropertiesGeneratorRepository artifactPropertiesGeneratorRepository) {
         super(goCache, sqlMapClient, systemEnvironment, database);
         this.environmentVariableDao = environmentVariableDao;
         this.goCache = goCache;
         this.transactionTemplate = transactionTemplate;
         this.cache = cache;
         this.transactionSynchronizationManager = transactionSynchronizationManager;
+        this.resourceRepository = resourceRepository;
+        this.artifactPlanRepository = artifactPlanRepository;
+        this.artifactPropertiesGeneratorRepository = artifactPropertiesGeneratorRepository;
     }
 
     public JobInstance buildByIdWithTransitions(long buildInstanceId) {
@@ -179,27 +184,27 @@ public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobI
 
     public void save(long jobId, JobPlan plan) {
         for (Resource resource : plan.getResources()) {
-            resource.setBuildId(jobId);
-            getSqlMapClientTemplate().insert("insertResource", resource);
+            resourceRepository.saveCopyOf(jobId, resource);
         }
         for (ArtifactPropertiesGenerator generator : plan.getPropertyGenerators()) {
-            generator.setJobId(jobId);
-            getSqlMapClientTemplate().insert("insertArtifactPropertiesGenerator", generator);
+            artifactPropertiesGeneratorRepository.saveCopyOf(jobId, generator);
         }
         for (ArtifactPlan artifactPlan : plan.getArtifactPlans()) {
-            artifactPlan.setBuildId(jobId);
-            getSqlMapClientTemplate().insert("insertArtifactPlan", artifactPlan);
+            artifactPlanRepository.saveCopyOf(jobId, artifactPlan);
         }
         environmentVariableDao.save(jobId, EnvironmentVariableSqlMapDao.EnvironmentVariableType.Job, plan.getVariables());
     }
 
     public JobPlan loadPlan(long jobId) {
-        JobPlan plan = (JobPlan) getSqlMapClientTemplate().queryForObject("select-job-plan", jobId);
-        loadVariables(plan);
+        DefaultJobPlan plan = (DefaultJobPlan) getSqlMapClientTemplate().queryForObject("select-job-plan", jobId);
+        loadJobPlanAssociatedEntities(plan);
         return plan;
     }
 
-    private void loadVariables(JobPlan plan) {
+    private void loadJobPlanAssociatedEntities(DefaultJobPlan plan) {
+        plan.setPlans(artifactPlanRepository.findByBuildId(plan.getJobId()));
+        plan.setGenerators(artifactPropertiesGeneratorRepository.findByBuildId(plan.getJobId()));
+        plan.setResources(resourceRepository.findByBuildId(plan.getJobId()));
         plan.setVariables(environmentVariableDao.load(plan.getJobId(), EnvironmentVariableSqlMapDao.EnvironmentVariableType.Job));
         plan.setTriggerVariables(environmentVariableDao.load(plan.getPipelineId(), EnvironmentVariableSqlMapDao.EnvironmentVariableType.Trigger));
     }
@@ -208,7 +213,6 @@ public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobI
         String key = cacheKeyForOriginalJobIdentifier(stageIdentifier, jobName);
 
         JobIdentifier jobIdentifier = (JobIdentifier) goCache.get(key);
-
         if (jobIdentifier == null) {
             synchronized (key) {
                 jobIdentifier = (JobIdentifier) goCache.get(key);
@@ -366,7 +370,26 @@ public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobI
 
         return new JobInstances(results);
     }
- 
+
+	public int getJobHistoryCount(String pipelineName, String stageName, String jobName) {
+		Map<String, Object> toGet = arguments("pipelineName", pipelineName).and("stageName", stageName).and("jobConfigName", jobName).asMap();
+		Integer count = (Integer) getSqlMapClientTemplate().queryForObject("getJobHistoryCount", toGet);
+		return count;
+	}
+
+	public JobInstances findJobHistoryPage(String pipelineName, String stageName, String jobConfigName, int count, int offset) {
+		Map params = new HashMap();
+		params.put("pipelineName", pipelineName);
+		params.put("stageName", stageName);
+		params.put("jobConfigName", jobConfigName);
+		params.put("count", count);
+		params.put("offset", offset);
+
+		List<JobInstance> results = (List<JobInstance>) getSqlMapClientTemplate().queryForList("findJobHistoryPage", params);
+
+		return new JobInstances(results);
+	}
+
     public List<JobPlan> orderedScheduledBuilds() {
         List<Long> jobIds = (List<Long>) getSqlMapClientTemplate().queryForList("scheduledPlanIds");
 
@@ -389,11 +412,11 @@ public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobI
     }
 
     private JobPlan _loadJobPlan(Long jobId) {
-        JobPlan jobPlan = (JobPlan) getSqlMapClientTemplate().queryForObject("scheduledPlan", arguments("id", jobId).asMap());
+        DefaultJobPlan jobPlan = (DefaultJobPlan) getSqlMapClientTemplate().queryForObject("scheduledPlan", arguments("id", jobId).asMap());
         if (jobPlan == null) {
             return null;
         }
-        loadVariables(jobPlan);
+        loadJobPlanAssociatedEntities(jobPlan);
         return jobPlan;
     }
 
@@ -446,5 +469,12 @@ public class JobInstanceSqlMapDao extends SqlMapClientDaoSupport implements JobI
         transition.setJobId(jobInstance.getId());
         transition.setStageId(jobInstance.getStageId());
         getSqlMapClientTemplate().insert("insertTransition", transition);
+    }
+
+    @Override
+    public void jobStatusChanged(final JobInstance job) {
+        if(job.isRescheduled()) {
+            goCache.remove(cacheKeyForOriginalJobIdentifier(job.getIdentifier().getStageIdentifier(), job.getName()));
+        }
     }
 }

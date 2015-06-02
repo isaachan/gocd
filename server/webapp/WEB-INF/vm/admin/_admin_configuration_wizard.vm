@@ -31,6 +31,6 @@
     <div class="clear"></div>
     #parse('admin/_configuration_wizard_jstemplate.vm')
     <div id="pipelines-configuration" class="wizard-content">
-        <img src="../images/spinner.gif" alt="loading..." />    
+        <img src="$req.getContextPath()/$concatenatedSpinnerIconFilePath" alt="loading..." />
     </div>
 </div>

@@ -16,10 +16,9 @@
 
 package com.thoughtworks.go.server.materials;
 
-import java.io.File;
-
 import com.thoughtworks.go.config.materials.Materials;
 import com.thoughtworks.go.config.materials.PackageMaterial;
+import com.thoughtworks.go.config.materials.PluggableSCMMaterial;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
 import com.thoughtworks.go.domain.MaterialInstance;
 import com.thoughtworks.go.domain.MaterialRevisions;
@@ -39,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionStatus;
 
+import java.io.File;
+
 /**
  * @understands how to update materials on the database from the real SCMs
  */
@@ -55,11 +56,12 @@ public class MaterialDatabaseUpdater {
     private final ScmMaterialUpdater scmMaterialUpdater;
     private MaterialExpansionService materialExpansionService;
     private PackageMaterialUpdater packageMaterialUpdater;
+    private PluggableSCMMaterialUpdater pluggableSCMMaterialUpdater;
 
     @Autowired
     public MaterialDatabaseUpdater(MaterialRepository materialRepository, ServerHealthService healthService, TransactionTemplate transactionTemplate,
                                    GoCache goCache, DependencyMaterialUpdater dependencyMaterialUpdater, ScmMaterialUpdater scmMaterialUpdater, PackageMaterialUpdater packageMaterialUpdater,
-                                   MaterialExpansionService materialExpansionService) {
+                                   PluggableSCMMaterialUpdater pluggableSCMMaterialUpdater, MaterialExpansionService materialExpansionService) {
         this.materialRepository = materialRepository;
         this.healthService = healthService;
         this.transactionTemplate = transactionTemplate;
@@ -67,6 +69,7 @@ public class MaterialDatabaseUpdater {
         this.dependencyMaterialUpdater = dependencyMaterialUpdater;
         this.scmMaterialUpdater = scmMaterialUpdater;
         this.packageMaterialUpdater = packageMaterialUpdater;
+        this.pluggableSCMMaterialUpdater = pluggableSCMMaterialUpdater;
         this.materialExpansionService = materialExpansionService;
     }
 
@@ -113,7 +116,8 @@ public class MaterialDatabaseUpdater {
             healthService.removeByScope(scope);
         } catch (Exception e) {
             String message = "Modification check failed for material: " + material.getLongDescription();
-            healthService.update(ServerHealthState.error(message, e.getMessage(), HealthStateType.general(scope)));
+            String errorDescription = e.getMessage() == null ? "Unknown error" : e.getMessage();
+            healthService.update(ServerHealthState.error(message, errorDescription, HealthStateType.general(scope)));
             LOGGER.warn(String.format("[Material Update] %s", message), e);
             throw e;
         }
@@ -157,6 +161,9 @@ public class MaterialDatabaseUpdater {
         }
         if (material instanceof PackageMaterial) {
             return packageMaterialUpdater;
+        }
+        if (material instanceof PluggableSCMMaterial) {
+            return pluggableSCMMaterialUpdater;
         }
         return scmMaterialUpdater;
     }

@@ -1,5 +1,5 @@
-/*************************GO-LICENSE-START*********************************
- * Copyright 2014 ThoughtWorks, Inc.
+/* ************************GO-LICENSE-START*********************************
+ * Copyright 2015 ThoughtWorks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,13 +12,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *************************GO-LICENSE-END***********************************/
+ * ************************GO-LICENSE-END***********************************/
 
 package com.thoughtworks.go.server.controller;
-
-import java.util.ArrayList;
-import java.util.List;
-import javax.servlet.http.HttpServletRequest;
 
 import com.thoughtworks.go.config.CaseInsensitiveString;
 import com.thoughtworks.go.config.PipelineConfigs;
@@ -31,10 +27,15 @@ import com.thoughtworks.go.i18n.Localizer;
 import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.service.SecurityService;
 import com.thoughtworks.go.server.service.UserService;
+import com.thoughtworks.go.util.GoConstants;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.springframework.web.servlet.ModelAndView;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
@@ -82,9 +83,10 @@ public class MyGoControllerTest {
         assertThat((Localizer) modelAndView.getModel().get("l"), is(localizer));
 
         assertThat((String) modelAndView.getModel().get("pipelines"),
-                is("[{\"name\":\"pipeline1-1\",\"stages\":[{\"stageName\":\"stage1-1\"},{\"stageName\":\"stage1-2\"}]},"
-                        + "{\"name\":\"PIPELINE2-1\",\"stages\":[{\"stageName\":\"stage2-1\"}]},"
-                        + "{\"name\":\"pipeline3-1\",\"stages\":[{\"stageName\":\"stage3-1\"}]}]"));
+                is("[{\"name\":\"" + GoConstants.ANY_PIPELINE + "\",\"stages\":[{\"stageName\":\"" + GoConstants.ANY_STAGE + "\"}]},"
+                        + "{\"name\":\"pipeline1-1\",\"stages\":[{\"stageName\":\"" + GoConstants.ANY_STAGE + "\"},{\"stageName\":\"stage1-1\"},{\"stageName\":\"stage1-2\"}]},"
+                        + "{\"name\":\"PIPELINE2-1\",\"stages\":[{\"stageName\":\"" + GoConstants.ANY_STAGE + "\"},{\"stageName\":\"stage2-1\"}]},"
+                        + "{\"name\":\"pipeline3-1\",\"stages\":[{\"stageName\":\"" + GoConstants.ANY_STAGE + "\"},{\"stageName\":\"stage3-1\"}]}]"));
     }
 
     private class MyGoControllerWithMockedUser extends MyGoController {

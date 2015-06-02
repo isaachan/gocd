@@ -16,33 +16,20 @@
 
 package com.thoughtworks.go.server.controller;
 
-import java.sql.SQLException;
-import java.util.HashMap;
-import javax.naming.NamingException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import com.thoughtworks.go.config.CaseInsensitiveString;
 import com.thoughtworks.go.config.PipelineConfig;
 import com.thoughtworks.go.config.PipelineNotFoundException;
-import com.thoughtworks.go.util.json.JsonMap;
 import com.thoughtworks.go.server.controller.actions.JsonAction;
 import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.scheduling.ScheduleOptions;
-import com.thoughtworks.go.server.service.CcTrayStatusService;
-import com.thoughtworks.go.server.service.GoConfigService;
-import com.thoughtworks.go.server.service.JsonCurrentActivityService;
-import com.thoughtworks.go.server.service.PipelinePauseService;
-import com.thoughtworks.go.server.service.PipelineScheduler;
-import com.thoughtworks.go.server.service.SecurityService;
+import com.thoughtworks.go.server.service.*;
 import com.thoughtworks.go.server.service.result.ServerHealthStateOperationResult;
 import com.thoughtworks.go.server.util.ErrorHandler;
 import com.thoughtworks.go.server.util.UserHelper;
-import com.thoughtworks.go.server.web.XmlModelAndView;
+import com.thoughtworks.go.util.json.JsonMap;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.URIException;
 import org.apache.log4j.Logger;
-import org.jdom.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,11 +37,15 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
-import static com.thoughtworks.go.util.json.JsonHelper.addFriendlyErrorMessage;
-import static com.thoughtworks.go.server.controller.actions.JsonAction.jsonFound;
-import static com.thoughtworks.go.server.controller.actions.JsonAction.jsonNotAcceptable;
-import static com.thoughtworks.go.server.controller.actions.JsonAction.jsonNotFound;
+import javax.naming.NamingException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.sql.SQLException;
+import java.util.HashMap;
+
+import static com.thoughtworks.go.server.controller.actions.JsonAction.*;
 import static com.thoughtworks.go.util.GoConstants.ERROR_FOR_JSON;
+import static com.thoughtworks.go.util.json.JsonHelper.addFriendlyErrorMessage;
 import static org.apache.commons.lang.StringUtils.isEmpty;
 
 @Controller
@@ -65,7 +56,6 @@ public class PipelineStatusController {
 
     private final GoConfigService goConfigService;
     private final PipelineScheduler buildCauseProducer;
-    private final CcTrayStatusService ccTrayStatusService;
     private final SecurityService securityService;
     private final JsonCurrentActivityService jsonCurrentActivityService;
     private PipelinePauseService pipelinePauseService;
@@ -73,13 +63,11 @@ public class PipelineStatusController {
     @Autowired
     public PipelineStatusController(GoConfigService goConfigService,
                                     PipelineScheduler buildCauseProducer,
-                                    CcTrayStatusService ccTrayStatusService,
                                     SecurityService securityService,
                                     JsonCurrentActivityService jsonCurrentActivityService,
                                     PipelinePauseService pipelinePauseService) {
         this.goConfigService = goConfigService;
         this.buildCauseProducer = buildCauseProducer;
-        this.ccTrayStatusService = ccTrayStatusService;
         this.securityService = securityService;
         this.jsonCurrentActivityService = jsonCurrentActivityService;
         this.pipelinePauseService = pipelinePauseService;
@@ -106,40 +94,6 @@ public class PipelineStatusController {
         }
     }
 
-    /**
-     * @deprecated #5839 - unsupported since 12.3 sriki/sachin
-     */
-    @RequestMapping(value = "/**/pausePipeline.json", method = RequestMethod.POST)
-    public void pauseViaPost(@RequestParam(value = "pipelineName")String pipelineName,
-                             @RequestParam(value = "pauseCause")String pauseCause,
-                             HttpServletRequest request,
-                             HttpServletResponse response) throws SQLException, NamingException {
-        if (isEmpty(pipelineName)) {
-            response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-            return;
-        }
-        Username userName = UserHelper.getUserName();
-        pipelinePauseService.pause(pipelineName, pauseCause, userName);
-        LOGGER.info(String.format("[JSON API] Pipeline[%s] is paused by [%s] because [%s]", pipelineName, userName.getDisplayName(), pauseCause));
-    }
-
-    /**
-     * @deprecated #5839 - unsupported since 12.3 sriki/sachin
-     */
-    @RequestMapping(value = "/**/unpausePipeline.json", method = RequestMethod.POST)
-    public void unpauseViaPost(@RequestParam(value = "pipelineName")String pipelineName,
-                               HttpServletRequest request,
-                               HttpServletResponse response) throws SQLException, NamingException {
-        if (isEmpty(pipelineName)) {
-            response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-            return;
-        }
-        pipelinePauseService.unpause(pipelineName);
-
-        String userName = UserHelper.getUserName().getDisplayName();
-        LOGGER.info(String.format("[JSON API] Pipeline [%s] is unpaused by [%s]", pipelineName, userName));
-    }
-
     @RequestMapping(value = "/**/pipelineStatus.json", method = RequestMethod.GET)
     public ModelAndView list(@RequestParam(value = "pipelineName", required = false)String pipelineName,
                              @RequestParam(value = "useCache", required = false)Boolean useCache,
@@ -157,15 +111,9 @@ public class PipelineStatusController {
         }
     }
 
-    @RequestMapping(value = "/**/cctray.xml", method = RequestMethod.GET)
-    public ModelAndView cctray(HttpServletRequest request) throws Exception {
-        Document document = ccTrayStatusService.createCctrayXmlDocument(getFullContextPath(request));
-        return new XmlModelAndView(document);
-    }
-
     @ErrorHandler
     public ModelAndView handleError(HttpServletRequest request, HttpServletResponse response, Exception e) {
-        LOGGER.error("Error happend", e);
+        LOGGER.error("Error happened", e);
         JsonMap json = new JsonMap();
         String pipelineName = request.getParameter("pipelineName");
         if (isEmpty(pipelineName) && isForceBuildRequest(request)) {

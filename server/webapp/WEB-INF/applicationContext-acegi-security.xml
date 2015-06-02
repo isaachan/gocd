@@ -37,19 +37,19 @@
             <value>
                 CONVERT_URL_TO_LOWERCASE_BEFORE_COMPARISON
                 PATTERN_TYPE_APACHE_ANT
-                /rails/cas_errors/**=performanceLoggingFilter,i18nlocaleResolver,anonymousProcessingFilter,flashLoader,urlRewriter
-                /remoting/**=performanceLoggingFilter,artifactSizeEnforcementFilter,i18nlocaleResolver,x509ProcessingFilter,x509AccessDenied,agentRemotingFilterInvocationInterceptor,flashLoader,urlRewriter
-                /api/feeds/**=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
-                /api/pipelines.xml=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
-                /api/*/*.xml=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
-                /api/pipelines/*/*.xml=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /rails/cas_errors/**=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,anonymousProcessingFilter,flashLoader,urlRewriter
+                /remoting/**=performanceLoggingFilter,modeAwareFilter,artifactSizeEnforcementFilter,i18nlocaleResolver,x509ProcessingFilter,x509AccessDenied,agentRemotingFilterInvocationInterceptor,flashLoader,urlRewriter
+                /api/feeds/**=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,apiSessionFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /api/pipelines.xml=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,apiSessionFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /api/*/*.xml=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,apiSessionFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /api/pipelines/*/*.xml=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,apiSessionFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
 
-                /gadgets/**=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /gadgets/**=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
 
-                /cctray.xml=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
-                /api/**=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
-                /files/**=performanceLoggingFilter,artifactSizeEnforcementFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,cruiseLoginOrBasicAuthentication,filterInvocationInterceptor,flashLoader,urlRewriter
-                /**=performanceLoggingFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,cruiseLoginOrBasicAuthentication,filterInvocationInterceptor,flashLoader,urlRewriter
+                /cctray.xml=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,apiSessionFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /api/**=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,apiSessionFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,basicAuthenticationAccessDenied,filterInvocationInterceptor,flashLoader,urlRewriter
+                /files/**=performanceLoggingFilter,modeAwareFilter,artifactSizeEnforcementFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,cruiseLoginOrBasicAuthentication,filterInvocationInterceptor,flashLoader,urlRewriter
+                /**=performanceLoggingFilter,modeAwareFilter,i18nlocaleResolver,configValidityFilter,httpSessionContextIntegrationFilter,goLogoutFilter,removeAdminPermissionFilter,casAuthProcessingFilter,oauthProcessingFilter,basicProcessingFilter,authenticationProcessingFilter,userEnabledCheckFilter,anonymousProcessingFilter,cruiseLoginOrBasicAuthentication,filterInvocationInterceptor,flashLoader,urlRewriter
             </value>
         </property>
     </bean>
@@ -61,9 +61,13 @@
     <bean id="i18nlocaleResolver" class="com.thoughtworks.go.server.web.i18n.LocaleResolver" autowire="autodetect"/>
 
     <bean id="configValidityFilter" class="com.thoughtworks.go.server.web.ConfigValidityFilter" autowire="autodetect"/>
+    <bean id="apiSessionFilter" class="com.thoughtworks.go.server.web.ApiSessionFilter"/>
 
     <bean id="anonymousProcessingFilter" class="com.thoughtworks.go.server.security.AnonymousProcessingFilter" autowire="autodetect"/>
-    <bean id="performanceLoggingFilter" class="com.thoughtworks.go.server.security.PerformanceLoggingFilter" />
+    <bean id="modeAwareFilter" class="com.thoughtworks.go.server.security.ModeAwareFilter" autowire="autodetect"/>
+    <bean id="performanceLoggingFilter" class="com.thoughtworks.go.server.security.PerformanceLoggingFilter" >
+        <constructor-arg ref="webRequestPerformanceLogger"/>
+    </bean>
 
     <bean id="httpSessionContextIntegrationFilter"
           class="org.springframework.security.context.HttpSessionContextIntegrationFilter"/>
@@ -115,6 +119,11 @@
                 </bean>
                 <bean factory-bean="licenseEnforcementProviderFactory" factory-method="setProvider">
                     <constructor-arg index="0" ref="ldapAuthProvider"/>
+                </bean>
+                <bean factory-bean="licenseEnforcementProviderFactory" factory-method="setProvider">
+                    <constructor-arg index="0">
+                        <bean class="com.thoughtworks.go.server.security.providers.PluginAuthenticationProvider" autowire="autodetect"/>
+                    </constructor-arg>
                 </bean>
                 <bean class="org.springframework.security.providers.anonymous.AnonymousAuthenticationProvider" p:key="anonymousKey"/>
             </list>
@@ -236,6 +245,7 @@
                 /api/server.xml=IS_AUTHENTICATED_ANONYMOUSLY
                 /shine/sparql.xml=IS_AUTHENTICATED_ANONYMOUSLY
                 /compressed/*=IS_AUTHENTICATED_ANONYMOUSLY
+                /assets/**=IS_AUTHENTICATED_ANONYMOUSLY
                 /css/**=IS_AUTHENTICATED_ANONYMOUSLY
                 /**/*.css=IS_AUTHENTICATED_ANONYMOUSLY
                 /**/*.js=IS_AUTHENTICATED_ANONYMOUSLY
@@ -259,6 +269,7 @@
                 /admin/commands/**=ROLE_SUPERVISOR,ROLE_GROUP_SUPERVISOR, ROLE_TEMPLATE_SUPERVISOR
                 /admin/plugins=ROLE_SUPERVISOR,ROLE_GROUP_SUPERVISOR
                 /admin/pipeline/**=ROLE_SUPERVISOR,ROLE_GROUP_SUPERVISOR
+                /admin/materials/**=ROLE_SUPERVISOR,ROLE_GROUP_SUPERVISOR
                 /admin/package_repositories/**=ROLE_SUPERVISOR,ROLE_GROUP_SUPERVISOR
                 /admin/package_definitions/**=ROLE_SUPERVISOR,ROLE_GROUP_SUPERVISOR
                 /api/admin/**=ROLE_SUPERVISOR
@@ -267,33 +278,34 @@
                 /**/addresources.json=ROLE_SUPERVISOR
                 /**/registeragent.json=ROLE_SUPERVISOR
                 /api/feeds/**=ROLE_SUPERVISOR
+                /api/support=ROLE_SUPERVISOR
                 /api/pipelines.xml=ROLE_USER
                 /api/*/*.xml=ROLE_USER
                 /api/users.xml=ROLE_SUPERVISOR
                 /api/pipelines/*/*.xml=ROLE_USER,ROLE_OAUTH_USER
                 /*/environments/*=ROLE_SUPERVISOR
 
-                /admin/oauth/clients=ROLE_SUPERVISOR
-                /admin/oauth/clients/**=ROLE_SUPERVISOR
-
-                /admin/user_tokens/revoke_by_admin=ROLE_SUPERVISOR
-                /admin/user_tokens/revoke_by_admin/**=ROLE_SUPERVISOR
-
-                /admin/gadgets/oauth_clients=ROLE_SUPERVISOR
-                /admin/gadgets/oauth_clients/**=ROLE_SUPERVISOR
+                /oauth/admin/**=ROLE_SUPERVISOR
 
                 /oauth/token=IS_AUTHENTICATED_ANONYMOUSLY
+                /oauth/authorize=ROLE_USER
+                /oauth/user_tokens=ROLE_USER
+                /oauth/user_tokens/revoke/**=ROLE_USER
 
                 /gadgets/pipeline.xml=IS_AUTHENTICATED_ANONYMOUSLY
                 /gadgets/pipeline/**=ROLE_OAUTH_USER,ROLE_USER
                 /gadgets/remote_materials.xml=IS_AUTHENTICATED_ANONYMOUSLY
                 /gadgets/remote_materials/**=ROLE_OAUTH_USER,ROLE_USER
 
+                /plugin/interact/**=IS_AUTHENTICATED_ANONYMOUSLY
+
                 /agents/*/job_run_history*=ROLE_SUPERVISOR
                 /agents/*/job_run_history/*=ROLE_SUPERVISOR
                 /metrics=ROLE_SUPERVISOR
                 /metrics/*=ROLE_SUPERVISOR
                 /config_view/templates/*=ROLE_GROUP_SUPERVISOR, ROLE_SUPERVISOR
+                /add-on/*/admin/**=ROLE_SUPERVISOR
+                /add-on/*/api/**=ROLE_OAUTH_USER
                 /**=ROLE_USER
             ]]></value>
         </property>

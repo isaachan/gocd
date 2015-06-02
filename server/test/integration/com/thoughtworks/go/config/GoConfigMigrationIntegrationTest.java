@@ -31,6 +31,7 @@ import com.thoughtworks.go.config.registry.ConfigElementImplementationRegistry;
 import com.thoughtworks.go.config.server.security.ldap.BasesConfig;
 import com.thoughtworks.go.config.validation.GoConfigValidity;
 import com.thoughtworks.go.domain.GoConfigRevision;
+import com.thoughtworks.go.domain.Task;
 import com.thoughtworks.go.domain.config.Configuration;
 import com.thoughtworks.go.domain.config.ConfigurationProperty;
 import com.thoughtworks.go.domain.config.PluginConfiguration;
@@ -71,6 +72,7 @@ import static java.util.Arrays.asList;
 import static junit.framework.Assert.fail;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNot.not;
@@ -221,7 +223,7 @@ public class GoConfigMigrationIntegrationTest {
 
     @Test
     public void shouldMigrateApprovalsCorrectlyBug2112() throws Exception {
-        File bjcruise = new File("../common/test-resources/data/bjcruise-cruise-config-1.0.xml");
+        File bjcruise = new File("../common/test-resources/unit/data/bjcruise-cruise-config-1.0.xml");
         assertThat(bjcruise.exists(), is(true));
         String xml = readToEnd(bjcruise);
 
@@ -275,7 +277,7 @@ public class GoConfigMigrationIntegrationTest {
     @Test
     public void shouldMigrateDependsOnTagToBeADependencyMaterial() throws Exception {
         String content = FileUtils.readFileToString(
-                new File("../common/test-resources/data/config/version4/cruise-config-dependency-migration.xml"));
+                new File("../common/test-resources/unit/data/config/version4/cruise-config-dependency-migration.xml"));
         CruiseConfig cruiseConfig = loadConfigFileWithContent(content);
         MaterialConfig actual = cruiseConfig.pipelineConfigByName(new CaseInsensitiveString("depends")).materialConfigs().first();
         assertThat(actual, instanceOf(DependencyMaterialConfig.class));
@@ -1055,6 +1057,64 @@ public class GoConfigMigrationIntegrationTest {
         String migratedContent = migrateXmlString(configWithLicenseSection, 71);
         assertThat(migratedContent, not(containsString("license")));
         assertThat(migratedContent, not(containsString(licenseUser)));
+    }
+
+    @Test
+    public void shouldTrimLeadingAndTrailingWhitespaceFromCommands_asPartOfMigration73() throws Exception {
+        String configXml =
+            "<cruise schemaVersion='72'>" +
+                "  <pipelines group='first'>" +
+                "    <pipeline name='Test'>" +
+                "      <materials>" +
+                "        <hg url='../manual-testing/ant_hg/dummy' />" +
+                "      </materials>" +
+                "      <stage name='Functional'>" +
+                "        <jobs>" +
+                "          <job name='Functional'>" +
+                "            <tasks>" +
+                "              <exec command='  c:\\program files\\cmd.exe    ' args='arguments' />" +
+                "            </tasks>" +
+                "           </job>" +
+                "        </jobs>" +
+                "      </stage>" +
+                "    </pipeline>" +
+                "  </pipelines>" +
+                "</cruise>";
+        CruiseConfig migratedConfig = migrateConfigAndLoadTheNewConfig(configXml, 72);
+        Task task = migratedConfig.tasksForJob("Test", "Functional", "Functional").get(0);
+        assertThat(task, is(instanceOf(ExecTask.class)));
+        assertThat((ExecTask) task, is(new ExecTask("c:\\program files\\cmd.exe", "arguments", (String) null)));
+    }
+
+    @Test
+    public void shouldTrimLeadingAndTrailingWhitespaceFromCommandsInTemplates_asPartOfMigration73() throws Exception {
+        String configXml =
+            "<cruise schemaVersion='72'>" +
+                "  <pipelines group='first'>" +
+                "    <pipeline name='Test' template='test_template'>" +
+                "      <materials>" +
+                "        <hg url='../manual-testing/ant_hg/dummy' />" +
+                "      </materials>" +
+                "     </pipeline>" +
+                "  </pipelines>" +
+                "  <templates>" +
+                "    <pipeline name='test_template'>" +
+                "      <stage name='Functional'>" +
+                "        <jobs>" +
+                "          <job name='Functional'>" +
+                "            <tasks>" +
+                "              <exec command='  c:\\program files\\cmd.exe    ' args='arguments' />" +
+                "            </tasks>" +
+                "           </job>" +
+                "        </jobs>" +
+                "      </stage>" +
+                "    </pipeline>" +
+                "  </templates>" +
+                "</cruise>";
+        CruiseConfig migratedConfig = migrateConfigAndLoadTheNewConfig(configXml, 72);
+        Task task = migratedConfig.tasksForJob("Test", "Functional", "Functional").get(0);
+        assertThat(task, is(instanceOf(ExecTask.class)));
+        assertThat((ExecTask) task, is(new ExecTask("c:\\program files\\cmd.exe", "arguments", (String) null)));
     }
 
     private void assertStringsIgnoringCarriageReturnAreEqual(String expected, String actual) {

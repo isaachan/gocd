@@ -19,6 +19,10 @@ package com.thoughtworks.go.plugin.api.task;
 import com.thoughtworks.go.plugin.api.config.Configuration;
 import com.thoughtworks.go.plugin.api.config.Property;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Allows the plugin to specify information about the configuration it accepts and expects.
  *
@@ -40,7 +44,10 @@ public class TaskConfig extends Configuration {
     }
 
     /**
-     * The value of the specified property, or null if not found.
+     * Retrieves the value of a property.
+     * @param propertyName Name of the property (or key) in the configuration.
+     *
+     * @return the value of the specified property, or null if not found.
      */
     public String getValue(String propertyName) {
         Property property = super.get(propertyName);
@@ -48,5 +55,14 @@ public class TaskConfig extends Configuration {
             return null;
         }
         return property.getValue();
+    }
+
+    public List<? extends  Property> list() {
+        ArrayList<TaskConfigProperty> list = new ArrayList<TaskConfigProperty>();
+        for (Property property : super.list()) {
+            list.add((TaskConfigProperty) property);
+        }
+        Collections.sort(list);
+        return list;
     }
 }

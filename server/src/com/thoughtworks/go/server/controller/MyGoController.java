@@ -1,27 +1,20 @@
-/*************************GO-LICENSE-START*********************************
+/* ************************GO-LICENSE-START*********************************
  * Copyright 2014 ThoughtWorks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *************************GO-LICENSE-END***********************************/
+ * ************************GO-LICENSE-END***********************************/
 
 package com.thoughtworks.go.server.controller;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import com.google.gson.GsonBuilder;
 import com.thoughtworks.go.config.CaseInsensitiveString;
@@ -39,7 +32,9 @@ import com.thoughtworks.go.server.service.SecurityService;
 import com.thoughtworks.go.server.service.UserService;
 import com.thoughtworks.go.server.ui.controller.Redirection;
 import com.thoughtworks.go.server.util.UserHelper;
+import com.thoughtworks.go.server.view.Escaper;
 import com.thoughtworks.go.server.web.JsonView;
+import com.thoughtworks.go.util.GoConstants;
 import com.thoughtworks.go.util.json.JsonMap;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +43,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 
 import static com.thoughtworks.go.server.controller.Message.error;
 import static com.thoughtworks.go.server.controller.Message.info;
@@ -166,6 +168,7 @@ public class MyGoController {
         List<PipelineConfigs> groups = securityService.viewableGroupsFor(getUserName());
         data.put("pipelines", new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create().toJson(getPipelineModelsSortedByNameFor(groups)));
         data.put("l", localizer);
+        data.put("escaper", new Escaper());
 
         message.populateModel(data);
         return new ModelAndView("mycruise/mycruise-tab", data);
@@ -173,6 +176,11 @@ public class MyGoController {
 
     private List<PipelineViewModel> getPipelineModelsSortedByNameFor(List<PipelineConfigs> groups) {
         List<PipelineViewModel> pipelineModels = new ArrayList<PipelineViewModel>();
+
+        List<PipelineViewModel.StageViewModel> anyPipelineStageModels= new ArrayList<PipelineViewModel.StageViewModel>();
+        anyPipelineStageModels.add(new PipelineViewModel.StageViewModel(GoConstants.ANY_STAGE));
+        pipelineModels.add(new PipelineViewModel(GoConstants.ANY_PIPELINE, anyPipelineStageModels));
+
         for (PipelineConfigs group : groups) {
             for (PipelineConfig pipelineConfig : group) {
                 pipelineModels.add(new PipelineViewModel(CaseInsensitiveString.str(pipelineConfig.name()), getStagesModelsFor(pipelineConfig)));
@@ -184,6 +192,7 @@ public class MyGoController {
 
     private List<PipelineViewModel.StageViewModel> getStagesModelsFor(PipelineConfig pipelineConfig) {
         List<PipelineViewModel.StageViewModel> stageModels = new ArrayList<PipelineViewModel.StageViewModel>();
+        stageModels.add(new PipelineViewModel.StageViewModel(GoConstants.ANY_STAGE));
         for (StageConfig stageConfig : pipelineConfig) {
             stageModels.add(new PipelineViewModel.StageViewModel(CaseInsensitiveString.str(stageConfig.name())));
         }

@@ -16,16 +16,14 @@
 
 package com.thoughtworks.go.util;
 
-import java.io.File;
-import java.io.Serializable;
-import java.util.Properties;
-
 import com.thoughtworks.go.utils.Timeout;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import static com.thoughtworks.go.util.ExceptionUtils.bomb;
+import java.io.File;
+import java.io.Serializable;
+import java.util.Properties;
 
 public class SystemEnvironment implements Serializable, ConfigDirProvider {
 
@@ -70,7 +68,6 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
     public static final String CONFIGURATION_NO = "N";
     public static final String RESOLVE_FANIN_REVISIONS = "resolve.fanin.revisions";
     public static final String RESOLVE_FANIN_FALLBACK_TRIANGLE = "resolve.fanin.fallback.triangle";
-    public static GoSystemProperty<Integer> RESOLVE_FANIN_MAX_BACK_TRACK_LIMIT = new CachedProperty<Integer>(new GoIntSystemProperty("resolve.fanin.max.backtrack.limit", 100));
     private String hsqlPath = null;
 
     public static final String ENABLE_CONFIG_MERGE_PROPERTY = "enable.config.merge";
@@ -106,6 +103,7 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
     public static final int TFS_SOCKET_TIMEOUT_IN_MILLISECONDS = 20 * 60 * 1000;
     public static final String TFS_SOCKET_TIMEOUT_PROPERTY = "tfs.socket.block.timeout";
 
+    public static GoSystemProperty<Integer> RESOLVE_FANIN_MAX_BACK_TRACK_LIMIT = new CachedProperty<Integer>(new GoIntSystemProperty("resolve.fanin.max.backtrack.limit", 100));
     public static GoSystemProperty<Integer> MATERIAL_UPDATE_INACTIVE_TIMEOUT = new CachedProperty<Integer>(new GoIntSystemProperty("material.update.inactive.timeout", 15));
 
     public static GoSystemProperty<Integer> H2_DB_TRACE_LEVEL = new GoIntSystemProperty("h2.trace.level", 1);
@@ -124,15 +122,23 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
     public static GoSystemProperty<Boolean> PLUGIN_FRAMEWORK_ENABLED = new GoBooleanSystemProperty("plugins.framework.enabled", Boolean.TRUE);
     public static GoSystemProperty<String> ALL_PLUGINS_ZIP_PATH = new GoStringSystemProperty("plugins.all.zip.path", new File(PLUGINS_PATH, "go-plugins-all.zip").getAbsolutePath());
     public static GoSystemProperty<String> ADDONS_PATH = new GoStringSystemProperty("addons.path", "addons");
+    public static GoSystemProperty<String> AVAILABLE_FEATURE_TOGGLES_FILE_PATH = new GoStringSystemProperty("available.toggles.path", "/available.toggles");
+    public static GoSystemProperty<String> USER_FEATURE_TOGGLES_FILE_PATH_RELATIVE_TO_CONFIG_DIR = new GoStringSystemProperty("user.toggles.path", "go.feature.toggles");
 
     public static GoSystemProperty<String> DEFAULT_COMMAND_SNIPPETS_ZIP = new CachedProperty<String>(
             new GoStringSystemProperty("default.command.snippets.zip.location", "/defaultFiles/defaultCommandSnippets.zip"));
     public static GoSystemProperty<String> DEFAULT_PLUGINS_ZIP = new CachedProperty<String>(
             new GoStringSystemProperty("default.plugins.zip.location", "/defaultFiles/plugins.zip"));
+    public static final GoSystemProperty<String> AGENT_PLUGINS_PATH = new CachedProperty<String>(new GoStringSystemProperty("agent.plugins.path", PLUGINS_PATH));
     public static GoSystemProperty<String> VERSION_FILE_IN_DEFAULT_COMMAND_REPOSITORY = new CachedProperty<String>(new GoStringSystemProperty("version.file.in.command.repository", "version.txt"));
     public static GoSystemProperty<Integer> COMMAND_REPOSITORY_CACHE_TIME_IN_SECONDS = new CachedProperty<Integer>(new GoIntSystemProperty("command.repo.cache.timeout.in.secs", 30 * 60));
     public static GoSystemProperty<String> COMMAND_REPOSITORY_DIRECTORY = new CachedProperty<String>(new GoStringSystemProperty("command.repo.dir", DB_BASE_DIR + "command_repository"));
     public static GoSystemProperty<Boolean> CAPTURE_METRICS = new GoBooleanSystemProperty("capture.metrics", true);
+    public static GoSystemProperty<Integer> IDLE_TIMEOUT = new GoIntSystemProperty("idle.timeout", 30000);
+    public static GoSystemProperty<Integer> RESPONSE_BUFFER_SIZE = new GoIntSystemProperty("response.buffer.size", 32768);
+    public static final GoSystemProperty<Integer> API_REQUEST_IDLE_TIMEOUT_IN_SECONDS = new GoIntSystemProperty("api.request.idle.timeout.seconds", 300);
+
+    public static GoSystemProperty<Integer> PLUGIN_NOTIFICATION_LISTENER_COUNT = new CachedProperty<Integer>(new GoIntSystemProperty("plugin.notification.listener.count", 1));
 
     /* DATABASE CONFIGURATION - Defaults are of H2 */
     public static GoSystemProperty<String> GO_DATABASE_HOST = new GoStringSystemProperty("db.host", "localhost");
@@ -144,7 +150,14 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
     public static GoIntSystemProperty GO_DATABASE_MAX_IDLE = new GoIntSystemProperty("db.maxIdle", 32);
     public static final String H2_DATABASE = "com.thoughtworks.go.server.database.H2Database";
     public static GoStringSystemProperty GO_DATABASE_PROVIDER = new GoStringSystemProperty("go.database.provider", H2_DATABASE);
+    public static GoSystemProperty<Boolean> SHOULD_VALIDATE_XML_AGAINST_DTD = new GoBooleanSystemProperty("validate.xml.against.dtd", false);
+    public static GoSystemProperty<String> JETTY_XML_FILE_NAME = new GoStringSystemProperty("jetty.xml.file.name", JETTY_XML);
 
+    public static final String JETTY6 = "com.thoughtworks.go.server.Jetty6Server";
+    public static final String JETTY9 = "com.thoughtworks.go.server.Jetty9Server";
+    public static GoSystemProperty<String> APP_SERVER = new CachedProperty<String>(new GoStringSystemProperty("app.server", JETTY9));
+    public static GoSystemProperty<String> GO_SERVER_STATE = new GoStringSystemProperty("go.server.state", "active");
+    public static GoSystemProperty<String> GO_LANDING_PAGE = new GoStringSystemProperty("go.landing.page", "/pipelines");
 
     private volatile static Integer agentConnectionTimeout;
     private volatile static Integer cruiseSSlPort;
@@ -278,7 +291,7 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
     }
 
     public File getJettyConfigFile() {
-        return new File(getConfigDir(), JETTY_XML);
+        return new File(getConfigDir(), get(JETTY_XML_FILE_NAME));
     }
 
     /**
@@ -299,7 +312,7 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
         return System.getProperty(property, defaultValue);
     }
 
-    private String getPropertyImpl(String property) {
+    public String getPropertyImpl(String property) {
         return System.getProperty(property);
     }
 
@@ -378,6 +391,10 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
 
     public int getNumberOfMaterialCheckListener() {
         return Integer.parseInt(getPropertyImpl("material.check.threads", "10"));
+    }
+
+    public int getNumberOfPluginNotificationListener() {
+        return PLUGIN_NOTIFICATION_LISTENER_COUNT.getValue();
     }
 
     public File getAgentJarFile() {
@@ -603,6 +620,10 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
         return new File(get(PLUGIN_EXTERNAL_PROVIDED_PATH)).getAbsolutePath();
     }
 
+    public String getBundledPluginAbsolutePath() {
+        return new File(get(PLUGIN_GO_PROVIDED_PATH)).getAbsolutePath();
+    }
+
     public <T> void reset(GoSystemProperty<T> systemProperty) {
         System.clearProperty(systemProperty.propertyName());
         if (systemProperty instanceof CachedProperty) {
@@ -622,12 +643,31 @@ public class SystemEnvironment implements Serializable, ConfigDirProvider {
         return GO_DATABASE_PROVIDER.getValue();
     }
 
+    public String landingPage() {
+        return GO_LANDING_PAGE.getValue();
+    }
+
+    public boolean usingJetty9() {
+        return get(APP_SERVER).equals(JETTY9);
+    }
+
+    public boolean isServerActive() {
+        return GO_SERVER_STATE.getValue().equalsIgnoreCase("active");
+    }
+
+    public void switchToActiveState() {
+        set(GO_SERVER_STATE, "active");
+    }
+
+    public void switchToPassiveState() {
+        set(GO_SERVER_STATE, "passive");
+    }
 
     public static abstract class GoSystemProperty<T> {
         private String propertyName;
         private T defaultValue;
 
-        private GoSystemProperty(String propertyName, T defaultValue) {
+        protected GoSystemProperty(String propertyName, T defaultValue) {
             this.propertyName = propertyName;
             this.defaultValue = defaultValue;
         }

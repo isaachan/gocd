@@ -18,8 +18,8 @@ require 'buildr/java/cobertura' unless ENV['INSTRUMENT_FOR_COVERAGE'].nil?
 require 'buildr/core/util'
 
 task :prepare do
-    system("mvn install -DskipTests") || raise("Failed to run: mvn install -DskipTests")
-    task("cruise:server:db:refresh").invoke
+  system("mvn install -DskipTests") || raise("Failed to run: mvn install -DskipTests")
+  task("cruise:server:db:refresh").invoke
 end
 
 task :clean do
@@ -49,6 +49,7 @@ define "cruise:agent-bootstrapper", :layout => agent_bootstrapper_layout("agent-
       include RpmPackageHelper
       include WinPackageHelper
       include SolarisPackageHelper
+      include OSXPackageHelper
       include CopyHelper
     end
     self.metadata_src_project = 'cruise:agent-bootstrapper'
@@ -98,12 +99,24 @@ define "cruise:agent-bootstrapper", :layout => agent_bootstrapper_layout("agent-
     end
 
     sol_build(:sol_data, 'agent', name_with_version)
+
+    task :osx => exploded_zip do
+      pkg = "agent"
+      pkg_dir = "Go Agent.app"
+      pkg_dir_path = File.join(osx_dir, pkg_dir)
+
+      copy_with_mode _(explode, "agent-bootstrapper.jar"), dest_with_mode(_(pkg_dir_path, "Contents", "Resources", "agent-bootstrapper.jar"), 0644)
+
+      build_osx_installer(pkg, pkg_dir)
+    end
   end
 end
 
 def clone_command_repo(command_repository_default_dir)
-  url = ENV["COMMAND_REPO_URL"] || 'github.com/goteam/go-command-repo.git'
-  system "git clone git://#{url} #{command_repository_default_dir}"
+  protocol = ENV["COMMAND_REPO_PROTOCOL"] || "https://"
+  url = ENV["COMMAND_REPO_URL"] || 'github.com/gocd/go-command-repo.git'
+  rm_rf command_repository_default_dir
+  sh "git clone #{protocol}#{url} #{command_repository_default_dir}"
 end
 
 define "cruise:server", :layout => server_layout("server") do
@@ -163,14 +176,41 @@ define "cruise:server", :layout => server_layout("server") do
   package(:jar, :file => _(:target, 'main.jar')).clean.with(:manifest => main_manifest).enhance do |jar|
     include_fileset_from_target(jar, 'server', "**/GoLauncher.class")
     include_fileset_from_target(jar, 'server', "**/GoLauncher.class")
-    include_fileset_from_target(jar, 'server', "**/GoSslSocketConnector.class")
-    include_fileset_from_target(jar, 'server', "**/GoCipherSuite.class")
     include_fileset_from_target(jar, 'server', "**/GoServer*.class")
-    include_fileset_from_target(jar, 'server', "**/JettyServer*.class")
-    include_fileset_from_target(jar, 'server', "**/GoWebXmlConfiguration*.class")
-    include_fileset_from_target(jar, 'server', "**/StopJettyFromLocalhostServlet*.class")
     include_fileset_from_target(jar, 'server', "**/DeploymentContextWriter*.class")
     include_fileset_from_target(jar, 'server', "**/BaseUrlProvider*.class")
+
+    include_fileset_from_target(jar, 'app-server', "**/StopJettyFromLocalhostServlet*.class")
+    include_fileset_from_target(jar, 'app-server', "**/AppServer.class")
+    include_fileset_from_target(jar, 'app-server', "**/ServletHelper.class")
+    include_fileset_from_target(jar, 'app-server', "**/ServletRequest.class")
+    include_fileset_from_target(jar, 'app-server', "**/ServletResponse.class")
+
+    # ---- Jetty 9 start ---
+    include_fileset_from_target(jar, 'jetty9', "**/GoSslSocketConnector.class")
+    include_fileset_from_target(jar, 'jetty9', "**/GoPlainSocketConnector.class")
+    include_fileset_from_target(jar, 'jetty9', "**/GoSocketConnector.class")
+    include_fileset_from_target(jar, 'jetty9', "**/GoCipherSuite.class")
+    include_fileset_from_target(jar, 'jetty9', "**/Jetty9Server*.class")
+    include_fileset_from_target(jar, 'jetty9', "**/GoWebXmlConfiguration*.class")
+    include_fileset_from_target(jar, 'jetty9', "**/AssetsContextHandler*.class")
+    include_fileset_from_target(jar, 'jetty9', "**/AssetsContextHandlerInitializer*.class")
+    include_fileset_from_target(jar, 'jetty9', "**/Jetty9ServletHelper*.class")
+    include_fileset_from_target(jar, 'jetty9', "**/Jetty9Request.class")
+    include_fileset_from_target(jar, 'jetty9', "**/Jetty9Response.class")
+    # # ---- Jetty 9 end ---
+
+    # # ---- Jetty 6 start ---
+    include_fileset_from_target(jar, 'jetty6', "**/GoJetty6SslSocketConnector.class")
+    include_fileset_from_target(jar, 'jetty6', "**/GoJetty6CipherSuite.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6Server*.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6GoWebXmlConfiguration*.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6AssetsContextHandler*.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6AssetsContextHandlerInitializer*.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6ServletHelper*.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6Request.class")
+    include_fileset_from_target(jar, 'jetty6', "**/Jetty6Response.class")
+    # ---- Jetty 6 end ---
 
     include_fileset_from_target(jar, 'common', "**/SubprocessLogger*.class")
     include_fileset_from_target(jar, 'common', "**/validators/*.class")
@@ -225,7 +265,7 @@ define "cruise:server", :layout => server_layout("server") do
     File.open("#{plugins_dist_dir}/version.txt", "w") { |h| h.write("%s(%s)" % [VERSION_NUMBER, RELEASE_COMMIT]) } if File.exists? plugins_dist_dir
   end
 
-  cruise_war = _('target/cruise.war')
+  cruise_war = _(:target, 'cruise.war')
 
   cruise_jar = onejar(_(:target, 'go.jar')).enhance(['cruise:agent-bootstrapper:package']) do |onejar|
     onejar.path('defaultFiles/').include(cruise_war, h2db_zip, deltas_zip, command_repository_zip, plugins_zip,
@@ -236,9 +276,10 @@ define "cruise:server", :layout => server_layout("server") do
             _("../installers/server/release/cruise-config.xml"),
             _("../installers/server/release/config.properties"),
             _("properties/src/log4j.properties"),
-            _("config/jetty.xml"))
+            _("config/jetty.xml"),
+            _("config/jetty6.xml"))
 
-    onejar.path('lib/').include(server_launcher_dependencies).include(tw_go_jar('tfs-impl')).include(tw_go_jar('plugin-infra/go-plugin-activator', 'go-plugin-activator'))
+    onejar.path('lib/').include(server_launcher_dependencies).include(jetty_jars).include(tw_go_jar('tfs-impl')).include(tw_go_jar('plugin-infra/go-plugin-activator', 'go-plugin-activator'))
     include_fileset_from_target(onejar, 'server', "**/GoMacLauncher*")
     include_fileset_from_target(onejar, 'server', "**/Mac*")
     include_fileset_from_target(onejar, 'common', "log4j.upgrade.*.properties")
@@ -264,6 +305,7 @@ define "cruise:server", :layout => server_layout("server") do
       include RpmPackageHelper
       include WinPackageHelper
       include SolarisPackageHelper
+      include OSXPackageHelper
       include CopyHelper
     end
     self.metadata_src_project = 'cruise:server'
@@ -304,6 +346,17 @@ define "cruise:server", :layout => server_layout("server") do
     win_build(:windows_data, 'server', 'go-server', 'Server', 'jre')
 
     sol_build(exploded_zip, 'server', name_with_version)
+
+    task :osx => exploded_zip do
+      pkg = "server"
+      pkg_dir = "Go Server.app"
+      pkg_dir_path = File.join(osx_dir, pkg_dir)
+
+      copy_with_mode _(explode, "go.jar"), dest_with_mode(_(pkg_dir_path, "Contents", "Resources", "go.jar"), 0644)
+
+      build_osx_installer(pkg, pkg_dir)
+    end
+
   end
 
   task :pull_from_central_command_repo do
@@ -314,164 +367,34 @@ define "cruise:server", :layout => server_layout("server") do
   end
 
   task :bump_version_of_command_repository do
-    repo_url = ENV["COMMAND_REPO_URL"] || 'github.com/goteam/go-command-repo.git'
-    repo_full_url = "https://#{repo_url}"
+    repo_full_url = ENV["COMMAND_REPO_URL"] || 'git@github.com:gocd/go-command-repo.git'
     require 'tmpdir'
     tmp_dir = Dir.tmpdir
     temp_checkout_dir_location = File.join(tmp_dir, 'go-command-repo-for-push')
-    if (File.directory? temp_checkout_dir_location)
-      FileUtils.remove_dir temp_checkout_dir_location
-    end
-    if (File.file? temp_checkout_dir_location)
-      FileUtils.rm temp_checkout_dir_location
-    end
-    FileUtils.mkdir(temp_checkout_dir_location)
-    system "git clone #{repo_full_url} #{temp_checkout_dir_location}"
+    rm_rf temp_checkout_dir_location
+    mkdir_p temp_checkout_dir_location
+    sh "git clone #{repo_full_url} #{temp_checkout_dir_location}"
 
     version_file_location = File.join(temp_checkout_dir_location, 'version.txt')
     version_content_array = File.read(version_file_location).split('=')
     bump_version = bump_by_1(version_content_array[1])
     File.open(version_file_location, 'w') { |f| f.write("#{version_content_array[0]}=#{bump_version}") }
-    system <<END
-    cd #{temp_checkout_dir_location};
-    git config user.name goteam;
-    git config user.email support@thoughtworks.com;
-    git add #{version_file_location};
-    git commit -m 'Version - #{bump_version}';
-    git config remote.origin.url #{repo_full_url};
-    git push;
-END
+    cd temp_checkout_dir_location do
+      [
+        'git config user.name gocd',
+        'git config user.email go-cd@googlegroups.com',
+        "git add #{version_file_location}",
+        "git commit -m 'Version - #{bump_version}'",
+        "git config remote.origin.url #{repo_full_url}",
+        'git push'
+      ].each do |cmd|
+        sh cmd
+      end
+    end
   end
 
   def bump_by_1 old_value
     old_value.to_i + 1
-  end
-end
-
-desc "Use rails:test to run all RSpecs"
-define "cruise:rails", :layout => submodule_layout("rails") do
-
-  def server
-    project("server")
-  end
-
-  def server_class_path
-    classpath = File.read("server/target/server-test-dependencies").split(':')
-    classpath << server._("webapp")
-    classpath
-  end
-
-  def property_file_path
-    project('server')._('properties/test')
-  end
-
-  SERVER_RUN_DEPENDENCIES = [project("server").test]
-
-  task :setup_environment do
-    db_path = ENV["DB_PATH"]
-    config_path = ENV["CONFIG_PATH"]
-    db_path && (sh "cp #{db_path} server/db/h2db/cruise.h2.db")
-    config_path && (sh "cp #{config_path} server/config/cruise-config.xml")
-  end
-
-  RAILS_WORKING_DIR = File.join $PROJECT_BASE, 'server/webapp/WEB-INF/rails'
-
-  def execute_under_rails command
-    config_dir = _(:target, 'spec_server', 'config')
-
-    db_dir = _(:target, 'spec_server', 'db')
-    h2db_dir = File.join(db_dir, 'h2db')
-    deltas_dir = File.join(db_dir, 'h2deltas')
-
-    jruby = _('..', 'tools', 'jruby', 'bin', 'jruby')
-
-    filter_files(server._('config'), config_dir)
-    filter_files(server._('db/dbtemplate/h2db'), h2db_dir)
-    filter_files(server._('db/migrate/h2deltas'), deltas_dir)
-
-    if Util.win_os?
-
-      #
-      # This is necessary since -J-cp does not work on Windows in bat files.
-      # It is allegedly fixed in 1.4.0
-      # See: http://jira.codehaus.org/browse/JRUBY-2937
-      #
-      cmd = "cd #{RAILS_WORKING_DIR} && " +
-              'set CP=' + [server_class_path, property_file_path].flatten.join(File::PATH_SEPARATOR) + " && " +
-              jruby + ' -J-XX:MaxPermSize=400m ' + '-J-Dlog4j.configuration=' + _('properties/test/log4j.properties') +
-              ' -J-Dalways.reload.config.file=true ' +
-              ' -J-Dcruise.i18n.cache.life=0 ' +
-              ' -J-Dcruise.config.dir=' + config_dir +
-              ' -J-Dcruise.database.dir=' + h2db_dir +
-              (running_tests? ? ' -J-Dgo.enforce.serverId.immutability=N ' : '') +
-              ' -S ' + command
-
-      sh cmd
-
-    else
-      cmd = "cd #{RAILS_WORKING_DIR} &&" +
-              ' ' + jruby +
-              ' -J-Xmx1024m -J-XX:MaxPermSize=400m -J-Dlog4j.configuration=' +
-              _('properties/test/log4j.properties') +
-              ' -J-cp ' + [server_class_path, property_file_path].flatten.join(File::PATH_SEPARATOR) +
-              ' -J-Dalways.reload.config.file=true' +
-              ' -J-Dcruise.i18n.cache.life=0' +
-              ' -J-Dcruise.config.dir=' + config_dir +
-              ' -J-Dcruise.database.dir=' + h2db_dir +
-              (running_tests? ? ' -J-Dgo.enforce.serverId.immutability=N ' : '') +
-              ' -S ' + command
-      sh cmd
-    end
-
-  end
-
-  task 'copy_historical_jars' do
-    cp_r(project("server")._("historical_jars"), project("server")._("webapp/WEB-INF/rails"))
-  end
-
-  task 'clean_rails' do
-    db = File.join(RAILS_WORKING_DIR, "db")
-    [File.join(db, "h2db"), File.join(db, "config.git"), File.join(db, "shine")].each do |path|
-      rm_rf(path)
-    end
-  end
-
-  RAILS_DEPENDENCIES = SERVER_RUN_DEPENDENCIES + ['copy_historical_jars', 'cruise:server:clean-shine', 'clean_rails']
-
-  desc "Run all rspec tests, Use with test=no"
-  task "spec" => RAILS_DEPENDENCIES do
-    running_tests!
-    rm_rf _(:target, 'spec_server')
-    puts _(:reports, :spec)
-    str = 'script/spec' +
-            ' --require rspec-extra-formatters' +
-            ' --format specdoc' +
-            ' --format specdoc:' + _(:reports, :specs) + '/spec_full_report.txt' +
-            ' --format html:' + _(:reports, :specs) + '/spec_full_report.html' +
-            ' --format JUnitFormatter:' + _(:reports, :specs) + '/spec_full_report.xml' +
-            ' spec '
-    str=str+ "--pattern "+ ENV['spec_module']+'/**/*_spec.rb' if ENV.has_key? 'spec_module'
-    execute_under_rails(str)
-  end
-
-  task "exec" => RAILS_DEPENDENCIES do
-    not_running_tests!
-    execute_under_rails ENV['command']
-  end
-
-
-  task "spec_server" => RAILS_DEPENDENCIES do
-    running_tests!
-    rm_rf _(:target, 'spec_server')
-    execute_under_rails "script/spec_server -J-Xdebug -J-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5678"
-  end
-
-  task "jasmine" do
-    execute_under_rails "script/jasmine -J-Xdebug -J-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5678"
-  end
-
-  task "jasmine_server" do
-    execute_under_rails "script/jasmine_server -J-Xdebug -J-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5678"
   end
 end
 
@@ -495,37 +418,6 @@ define "cruise:misc", :layout => submodule_layout_for_different_src("server") do
         ant.check_missing_partitions(:moduleNames => "util,common,agent,agent-bootstrapper,test-utils,server")
       end
     end
-  end
-
-  def javascript_lint(files)
-    jslint_root = project('cruise:server').path_to("webapp/WEB-INF/rails/vendor/other/jslint")
-    jslint = %[java -jar #{File.join(jslint_root, "rhino.jar")} #{File.join(jslint_root, "jslint.js")}]
-    fail = false
-    errors = []
-    files.each do |file|
-      path = File.expand_path(file)
-      command = %[#{jslint} #{path}]
-      output = `#{command}`
-      unless output =~ /No problems found/i
-        errors << "#{path}:\n#{output}"
-        putc "F"
-        $stdout.flush
-        fail = true
-      else
-        putc "."
-        $stdout.flush
-      end
-    end
-    if fail
-      puts "\n" + errors.join("\n")
-      exit 1
-    else
-      puts "\n"
-    end
-  end
-
-  task :jslint do
-    javascript_lint Dir[project('cruise:server').path_to("webapp/javascripts/*.js")]
   end
 
   task :jsunit => [:set_browser_path, :prepare_jsunit_file_structure] do
@@ -563,14 +455,20 @@ define "cruise:misc", :layout => submodule_layout_for_different_src("server") do
     sh "firefox http://localhost:8585/jsunit/testRunner.html?testPage=http://localhost:8585/jsunit/tests/#{ENV['test']}.html\\&autoRun=true"
   end
 
-  COMPRESSED_ALL_DOT_JS = "server/target/all.js"
   task :prepare_jsunit_file_structure do
+    js_file = Dir["#{project('cruise:server').path_to("target/webapp/WEB-INF/rails.new/public/assets")}/application-*.js"][0]
+    raise "#{js_file} not found! did you run ./bn clean cruise:prepare?" unless File.exist?(js_file)
+
     mkdir_p _(:target, 'jsunit/compressed')
     filter_files(project('cruise:server').path_to("jsunit"), _(:target, "jsunit"))
     cp project('cruise:server').path_to("jsunit.xml"), _(:target)
-    cp COMPRESSED_ALL_DOT_JS, _(:target, 'jsunit/compressed/all.js')
-    cp project('cruise:server').path_to('webapp/javascripts/d3.js'), _(:target, 'jsunit/compressed/d3.js')
-    cp project('cruise:server').path_to('webapp/stylesheets/module.css'), _(:target, 'jsunit/css/module.css')
+    dest_file = _(:target, 'jsunit/compressed') + "/all.js"
+    rm dest_file if File.exist?(dest_file)
+    cp js_file, dest_file
+    cp "server/webapp/WEB-INF/rails.new/app/assets/javascripts/lib/d3-3.1.5.min.js", _(:target, 'jsunit/compressed')
+    cp "server/webapp/WEB-INF/rails.new/spec/javascripts/helpers/test_helper.js", _(:target, 'jsunit/compressed')
+
+    Dir.glob("server/webapp/WEB-INF/rails.new/public/assets/application*.css") {|f| cp File.expand_path(f), _(:target, 'jsunit/css/application.css') }
   end
 
   task :set_browser_path do
@@ -597,16 +495,16 @@ define "cruise:misc", :layout => submodule_layout_for_different_src("server") do
       zip_file_name = f if !f.scan(/go-server-.*-[0-9]+.zip/).empty?
     end
 
-    `unzip -o #{zip_file_name} -d #{cmd_repo_verification_dir}/go-server`
+    sh("unzip -o #{zip_file_name} -d #{cmd_repo_verification_dir}/go-server")
 
     #unzip go.jar and defaultFiles/defaultCommandSnippets.zip
     unzipped_go_server_dir = Dir.glob("#{cmd_repo_verification_dir}/go-server/*")[0]
-    `unzip -o #{unzipped_go_server_dir}/go.jar -d #{unzipped_go_server_dir}`
-    `unzip -o #{unzipped_go_server_dir}/defaultFiles/defaultCommandSnippets.zip -d #{unzipped_go_server_dir}/defaultCommandRepo`
-    `cd #{unzipped_go_server_dir}/defaultCommandRepo; git rev-parse HEAD > #{packaged_rev_file}`
+    sh("unzip -o #{unzipped_go_server_dir}/go.jar -d #{unzipped_go_server_dir}")
+    sh("unzip -o #{unzipped_go_server_dir}/defaultFiles/defaultCommandSnippets.zip -d #{unzipped_go_server_dir}/defaultCommandRepo")
+    sh("cd #{unzipped_go_server_dir}/defaultCommandRepo; git rev-parse HEAD > #{packaged_rev_file}")
 
     clone_command_repo("#{cmd_repo_verification_dir_absolute_path}/go-command-repo")
-    `cd #{cmd_repo_verification_dir}/go-command-repo; git rev-parse HEAD > #{current_rev_file}`
+    sh("cd #{cmd_repo_verification_dir}/go-command-repo; git rev-parse HEAD > #{current_rev_file}")
 
     packaged_revision = File.read("#{packaged_rev_file}")
     current_revision = File.read("#{current_rev_file}")
@@ -631,8 +529,8 @@ define 'cruise:pkg', :layout => submodule_layout('pkg') do
   end
 
   task :unzip => ['cruise:agent-bootstrapper:dist:zip', 'cruise:server:dist:zip'] do
-    `unzip -o #{project('cruise:agent-bootstrapper:dist').path_to(:zip_package)} -d #{_(:target, '..')}`
-    `unzip -o #{project('cruise:server:dist').path_to(:zip_package)} -d #{_(:target, '..')}`
+    sh("unzip -o #{project('cruise:agent-bootstrapper:dist').path_to(:zip_package)} -d #{_(:target, '..')}")
+    sh("unzip -o #{project('cruise:server:dist').path_to(:zip_package)} -d #{_(:target, '..')}")
   end
 
   task :debian => ['cruise:agent-bootstrapper:dist:debian', 'cruise:server:dist:debian'] do
@@ -660,9 +558,15 @@ define 'cruise:pkg', :layout => submodule_layout('pkg') do
     cp project('cruise:server:dist').path_to(:solaris_package), _(:target)
   end
 
+  task :osx => ['cruise:agent-bootstrapper:dist:osx', 'cruise:server:dist:osx'] do
+    mkdir_p _(:target)
+    cp project('cruise:agent-bootstrapper:dist').path_to(:osx_package), _(:target)
+    cp project('cruise:server:dist').path_to(:osx_package), _(:target)
+  end
+
   task :installer_links do
     go_site_url = ENV['GO_SITE_URL'] || ENV['GO_SERVER_URL']
-    raise 'Can only works on GO agent' unless go_site_url
+    raise 'Can only work on GO agent' unless go_site_url
     artifacts_dir = go_site_url + 'files/'
     artifacts_dir << %w{GO_PIPELINE_NAME GO_PIPELINE_COUNTER GO_STAGE_NAME GO_STAGE_COUNTER GO_JOB_NAME}.collect { |v| ENV[v] }.join("/")
 

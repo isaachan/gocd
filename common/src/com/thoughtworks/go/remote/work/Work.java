@@ -18,6 +18,9 @@ package com.thoughtworks.go.remote.work;
 
 import java.io.Serializable;
 
+import com.thoughtworks.go.plugin.access.packagematerial.PackageAsRepositoryExtension;
+import com.thoughtworks.go.plugin.access.pluggabletask.TaskExtension;
+import com.thoughtworks.go.plugin.access.scm.SCMExtension;
 import com.thoughtworks.go.publishers.GoArtifactsManipulator;
 import com.thoughtworks.go.remote.AgentIdentifier;
 import com.thoughtworks.go.remote.BuildRepositoryRemote;
@@ -28,9 +31,10 @@ import com.thoughtworks.go.server.service.AgentRuntimeInfo;
  * Work that needs to be done by an agent.
  */
 public interface Work extends Serializable {
-    void doWork(AgentIdentifier agentIdentifier,
-                BuildRepositoryRemote remoteBuildRepository,
-                GoArtifactsManipulator manipulator, EnvironmentVariableContext environmentVariableContext, AgentRuntimeInfo agentRuntimeInfo);
+    void doWork(AgentIdentifier agentIdentifier, BuildRepositoryRemote remoteBuildRepository, GoArtifactsManipulator manipulator,
+                EnvironmentVariableContext environmentVariableContext, AgentRuntimeInfo agentRuntimeInfo,
+                PackageAsRepositoryExtension packageAsRepositoryExtension, SCMExtension scmExtension, TaskExtension taskExtension);
+
     String description();
 
     void cancel(EnvironmentVariableContext environmentVariableContext, AgentRuntimeInfo agentruntimeInfo);

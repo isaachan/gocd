@@ -40,6 +40,7 @@ import com.thoughtworks.go.server.dao.UserDao;
 import com.thoughtworks.go.server.domain.PipelineConfigDependencyGraph;
 import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.domain.user.PipelineSelections;
+import com.thoughtworks.go.server.initializers.Initializer;
 import com.thoughtworks.go.server.persistence.PipelineRepository;
 import com.thoughtworks.go.server.security.GoAcl;
 import com.thoughtworks.go.server.service.result.HttpLocalizedOperationResult;
@@ -47,7 +48,10 @@ import com.thoughtworks.go.server.service.result.LocalizedOperationResult;
 import com.thoughtworks.go.serverhealth.HealthStateScope;
 import com.thoughtworks.go.serverhealth.HealthStateType;
 import com.thoughtworks.go.service.ConfigRepository;
-import com.thoughtworks.go.util.*;
+import com.thoughtworks.go.util.Clock;
+import com.thoughtworks.go.util.ExceptionUtils;
+import com.thoughtworks.go.util.GoConstants;
+import com.thoughtworks.go.util.SystemTimeClock;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dom4j.DocumentFactory;
@@ -69,7 +73,7 @@ import static com.thoughtworks.go.util.ExceptionUtils.bombIf;
 import static java.lang.String.format;
 
 @Service
-public class GoConfigService {
+public class GoConfigService implements Initializer {
     private GoConfigFileDao goConfigFileDao;
     private PipelineRepository pipelineRepository;
     private GoConfigMigration upgrader;
@@ -110,6 +114,7 @@ public class GoConfigService {
         this.clock = clock;
     }
 
+    @Override
     public void initialize() {
         this.goConfigFileDao.load();
         register(new BaseUrlChangeListener(serverConfig(), goCache));
@@ -198,10 +203,6 @@ public class GoConfigService {
 
     public AgentConfig agentByUuid(String uuid) {
         return agents().getAgentByUuid(uuid);
-    }
-
-    public boolean agentExists(String uuid) {
-        return agents().hasAgent(uuid);
     }
 
     public boolean isPipelineEmpty() {
@@ -435,6 +436,10 @@ public class GoConfigService {
         goConfigFileDao.updateAgentIp(uuid, ipAddress, userName);
     }
 
+    public void updateAgentAttributes(String uuid, String userName, String hostname, String resources) {
+        goConfigFileDao.updateAgentAttributes(uuid, userName, hostname, resources);
+    }
+
     public void updateAgentApprovalStatus(String uuid, Boolean isDenied) {
         goConfigFileDao.updateAgentApprovalStatus(uuid, isDenied);
     }
@@ -481,6 +486,10 @@ public class GoConfigService {
         getCurrentConfig().groups(allGroup);
         return allGroup;
     }
+
+	public PipelineGroups groups() {
+		return getCurrentConfig().getGroups();
+	}
 
     public List<Task> tasksForJob(String pipelineName, String stageName, String jobName) {
         return getCurrentConfig().tasksForJob(pipelineName, stageName, jobName);
@@ -562,7 +571,7 @@ public class GoConfigService {
         for (AgentInstance agentInstance : instances) {
             String uuid = agentInstance.getUuid();
 
-            if (this.agents().hasAgentIdentifiedWith(uuid)) {
+            if (hasAgent(uuid)) {
                 command.addCommand(GoConfigFileDao.updateApprovalStatus(uuid, disabled));
             } else {
                 AgentConfig agentConfig = agentInstance.agentConfig();
@@ -579,7 +588,7 @@ public class GoConfigService {
 
     public void approvePendingAgent(AgentInstance agentInstance) {
         agentInstance.enable();
-        if (this.agents().hasAgentIdentifiedWith(agentInstance.getUuid())) {
+        if (hasAgent(agentInstance.getUuid())) {
             LOGGER.warn("Registered agent with the same uuid [" + agentInstance + "] already approved.");
         } else {
             this.addAgent(agentInstance.agentConfig());
@@ -638,7 +647,7 @@ public class GoConfigService {
         GoConfigFileDao.CompositeConfigCommand command = new GoConfigFileDao.CompositeConfigCommand();
         for (AgentInstance agentInstance : instances) {
             String uuid = agentInstance.getUuid();
-            if (this.agents().hasAgentIdentifiedWith(uuid)) {
+            if (hasAgent(uuid)) {
                 for (TriStateSelection selection : selections) {
                     command.addCommand(new GoConfigFileDao.ModifyResourcesCommand(uuid, new Resource(selection.getValue()), selection.getAction()));
                 }
@@ -670,7 +679,7 @@ public class GoConfigService {
         GoConfigFileDao.CompositeConfigCommand command = new GoConfigFileDao.CompositeConfigCommand();
         for (AgentInstance agentInstance : agents) {
             String uuid = agentInstance.getUuid();
-            if (this.agents().hasAgentIdentifiedWith(uuid)) {
+            if (hasAgent(uuid)) {
                 for (TriStateSelection selection : selections) {
                     command.addCommand(new GoConfigFileDao.ModifyEnvironmentCommand(uuid, selection.getValue(), selection.getAction()));
                 }
@@ -699,6 +708,10 @@ public class GoConfigService {
         }
         return pipelines;
     }
+
+	public PipelineConfigs getAllPipelinesInGroup(String group) {
+		return getCurrentConfig().pipelines(group);
+	}
 
     public GoConfigValidity checkConfigFileValid() {
         return goConfigFileDao.checkConfigFileValid();
@@ -767,14 +780,17 @@ public class GoConfigService {
         }
     }
 
+    @Deprecated
     public XmlPartialSaver buildSaver(String pipeline, String stage, int buildIndex) {
         return new XmlPartialBuildSaver(pipeline, stage, buildIndex, registry);
     }
 
+    @Deprecated
     public XmlPartialSaver stageSaver(String pipelineName, int stageIndex) {
         return new XmlPartialStageSaver(pipelineName, stageIndex);
     }
 
+    @Deprecated
     public XmlPartialSaver pipelineSaver(String groupName, int pipelineIndex) {
         return new XmlPartialPipelineSaver(groupName, pipelineIndex, registry);
     }
@@ -835,12 +851,28 @@ public class GoConfigService {
         return pipelineSelections;
     }
 
-    public long persistSelectedPipelines(String id, Long userId, List<String> selectedPipelines) {
-        List<String> unselectedPipelines = getUnselectedPipelines(selectedPipelines);
-        return pipelineRepository.saveSelectedPipelines(getPipelineSelections(id, userId, unselectedPipelines));
+    public long persistSelectedPipelines(String id, Long userId, List<String> selectedPipelines, boolean isBlacklist) {
+        PipelineSelections pipelineSelections = findOrCreateCurrentPipelineSelectionsFor(id, userId);
+
+        if (isBlacklist) {
+            List<String> unselectedPipelines = invertSelections(selectedPipelines);
+            pipelineSelections.update(unselectedPipelines, clock.currentTime(), userId, isBlacklist);
+        } else {
+            pipelineSelections.update(selectedPipelines, clock.currentTime(), userId, isBlacklist);
+        }
+
+        return pipelineRepository.saveSelectedPipelines(pipelineSelections);
     }
 
-    private List<String> getUnselectedPipelines(List<String> selectedPipelines) {
+    private PipelineSelections findOrCreateCurrentPipelineSelectionsFor(String id, Long userId) {
+        PipelineSelections pipelineSelections = isSecurityEnabled() ? pipelineRepository.findPipelineSelectionsByUserId(userId) : pipelineRepository.findPipelineSelectionsById(id);
+        if (pipelineSelections == null) {
+            pipelineSelections = new PipelineSelections(new ArrayList<String>(), clock.currentTime(), userId, true);
+        }
+        return pipelineSelections;
+    }
+
+    private List<String> invertSelections(List<String> selectedPipelines) {
         List<String> unselectedPipelines = new ArrayList<String>();
         List<PipelineConfig> pipelineConfigList = cruiseConfig().getAllPipelineConfigs();
         for (PipelineConfig pipelineConfig : pipelineConfigList) {
@@ -860,15 +892,6 @@ public class GoConfigService {
         if (pipelineSelections == null) {
             pipelineSelections = pipelineRepository.findPipelineSelectionsById(id);
         }
-        return pipelineSelections;
-    }
-
-    private PipelineSelections getPipelineSelections(String id, Long userId, List<String> unselectedPipelines) {
-        PipelineSelections pipelineSelections = isSecurityEnabled() ? pipelineRepository.findPipelineSelectionsByUserId(userId) : pipelineRepository.findPipelineSelectionsById(id);
-        if (pipelineSelections == null) {
-            return new PipelineSelections(unselectedPipelines, clock.currentTime(), userId);
-        }
-        pipelineSelections.update(unselectedPipelines, clock.currentTime(), userId);
         return pipelineSelections;
     }
 
@@ -1030,6 +1053,14 @@ public class GoConfigService {
         return getCurrentConfig().getTemplates().canViewAndEditTemplate(username.getUsername());
     }
 
+    public void updateUserPipelineSelections(String id, Long userId, CaseInsensitiveString pipelineToAdd) {
+        PipelineSelections currentSelections = findOrCreateCurrentPipelineSelectionsFor(id, userId);
+        if (!currentSelections.isBlacklist()) {
+            currentSelections.addPipelineToSelections(pipelineToAdd);
+            pipelineRepository.saveSelectedPipelines(currentSelections);
+        }
+    }
+
     public abstract class XmlPartialSaver<T> {
         protected final SAXReader reader;
         private final ConfigElementImplementationRegistry registry;
@@ -1081,7 +1112,7 @@ public class GoConfigService {
         protected org.dom4j.Document documentRoot() throws Exception {
             CruiseConfig cruiseConfig = goConfigFileDao.loadForEditing();
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            new MagicalGoConfigXmlWriter(configCache, registry, metricsProbeService).write(cruiseConfig, out, false);
+            new MagicalGoConfigXmlWriter(configCache, registry, metricsProbeService).write(cruiseConfig, out, true);
             org.dom4j.Document document = reader.read(new StringReader(out.toString()));
             Map<String, String> map = new HashMap<String, String>();
             map.put("go", MagicalGoConfigXmlWriter.XML_NS);
@@ -1144,6 +1175,7 @@ public class GoConfigService {
         }
     }
 
+    @Deprecated
     private class XmlPartialStageSaver extends XmlPartialSaver<StageConfig> {
         private final String pipeline;
         private final int stageIndex;
@@ -1168,6 +1200,7 @@ public class GoConfigService {
         }
     }
 
+    @Deprecated
     private class XmlPartialBuildSaver extends XmlPartialSaver<JobConfig> {
         private final String pipeline;
         private final String stage;
@@ -1195,6 +1228,7 @@ public class GoConfigService {
         }
     }
 
+    @Deprecated
     private class XmlPartialPipelineSaver extends XmlPartialSaver<PipelineConfig> {
         private final int pipelineIndex;
         private final String groupName;
@@ -1219,6 +1253,7 @@ public class GoConfigService {
 
     }
 
+    @Deprecated
     public XmlPartialSaver templateSaver(int pipelineIndex) {
         return new XmlPartialTemplateSaver(pipelineIndex);
     }
@@ -1265,6 +1300,7 @@ public class GoConfigService {
         }
     }
 
+    @Deprecated
     private class XmlPartialTemplateSaver extends XmlPartialSaver<PipelineTemplateConfig> {
         private final int pipelineIndex;
 
@@ -1347,7 +1383,6 @@ public class GoConfigService {
 
         protected Object valid() {
             CruiseConfig config = configForEditing();
-            bombIf(!config.hasPipelineGroup(groupName), "Pipeline group does not exist.");
             PipelineConfigs group = config.findGroup(groupName);
             return group.getCopyForEditing();
         }
@@ -1360,7 +1395,7 @@ public class GoConfigService {
 
     public void saveOrUpdateAgent(AgentInstance agent) {
         AgentConfig agentConfig = agent.agentConfig();
-        if (this.agents().hasAgentIdentifiedWith(agentConfig.getUuid())) {
+        if (hasAgent(agentConfig.getUuid())) {
             this.updateAgentApprovalStatus(agentConfig.getUuid(), agentConfig.isDisabled());
         } else {
             this.addAgent(agentConfig);

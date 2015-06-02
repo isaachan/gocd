@@ -16,5 +16,5 @@
 #*************************GO-LICENSE-END**********************************
 
 
-tools/jruby/bin/jruby -S buildr cruise:misc:prepare_jsunit_file_structure
+tools/jruby-1.7.11/bin/jruby -S buildr cruise:misc:prepare_jsunit_file_structure
 /usr/bin/firefox $1

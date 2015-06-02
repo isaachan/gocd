@@ -16,62 +16,61 @@
 
 package com.thoughtworks.go.server.service;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.zip.ZipInputStream;
-
 import com.thoughtworks.go.domain.ArtifactUrlReader;
-import com.thoughtworks.go.domain.ConsoleOut;
 import com.thoughtworks.go.domain.JobIdentifier;
 import com.thoughtworks.go.domain.Stage;
 import com.thoughtworks.go.domain.StageIdentifier;
 import com.thoughtworks.go.domain.exception.IllegalArtifactLocationException;
 import com.thoughtworks.go.legacywrapper.LogParser;
+import com.thoughtworks.go.server.dao.StageDao;
 import com.thoughtworks.go.server.domain.LogFile;
 import com.thoughtworks.go.server.view.artifacts.ArtifactDirectoryChooser;
 import com.thoughtworks.go.server.view.artifacts.BuildIdArtifactLocator;
 import com.thoughtworks.go.server.view.artifacts.PathBasedArtifactsLocator;
 import com.thoughtworks.go.util.*;
-import com.thoughtworks.go.util.GoConstants;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.zip.ZipInputStream;
+
 import static java.lang.String.format;
 
 @Service
 public class ArtifactsService implements ArtifactUrlReader {
-    public static final int DEFAULT_CONSOLE_LOG_LINE_BUFFER_SIZE = 1024;
-    private final SystemService systemService;
     private final ArtifactsDirHolder artifactsDirHolder;
     private final ZipUtil zipUtil;
     private final JobResolverService jobResolverService;
-    private final StageService stageService;
-    @Autowired private LogParser logParser;
+    private final StageDao stageDao;
+    private SystemService systemService;
+    @Autowired
+    private LogParser logParser;
     public static final Logger LOGGER = Logger.getLogger(ArtifactsService.class);
     public static final String LOG_XML_NAME = "log.xml";
     private ArtifactDirectoryChooser chooser;
 
     @Autowired
-    public ArtifactsService(SystemService systemService, ArtifactsDirHolder artifactsDirHolder, ZipUtil zipUtil, JobResolverService jobResolverService, StageService stageService) {
-        this.systemService = systemService;
+    public ArtifactsService(JobResolverService jobResolverService, StageDao stageDao,
+                            ArtifactsDirHolder artifactsDirHolder, ZipUtil zipUtil, SystemService systemService) {
+        this(jobResolverService, stageDao, artifactsDirHolder, zipUtil, systemService, new ArtifactDirectoryChooser());
+    }
+
+    protected ArtifactsService(JobResolverService jobResolverService, StageDao stageDao,
+                               ArtifactsDirHolder artifactsDirHolder, ZipUtil zipUtil, SystemService systemService, ArtifactDirectoryChooser chooser) {
         this.artifactsDirHolder = artifactsDirHolder;
         this.zipUtil = zipUtil;
         this.jobResolverService = jobResolverService;
-        this.stageService = stageService;
+        this.stageDao = stageDao;
+        this.systemService = systemService;
 
         //This is a Chain of Responsibility to decide which view should be shown for a particular artifact URL
-        chooser = new ArtifactDirectoryChooser();
+        this.chooser = chooser;
 
     }
 
@@ -153,138 +152,6 @@ public class ArtifactsService implements ArtifactUrlReader {
         return new File(logFile.getParent(), "." + logFile.getName() + ".ser");
     }
 
-    public static interface LineListener {
-        LineListener NO_OP_LINE_LISTENER = new LineListener() {
-            public void copyLine(CharSequence line) {
-
-            }
-        };
-
-        void copyLine(CharSequence line);
-    }
-
-    private char[] realloc(char[] old) {
-        char[] newAlloc = new char[old.length * 2];
-        for (int i = 0; i < old.length; i++) {
-            newAlloc[i] = old[i];
-        }
-        return newAlloc;
-    }
-
-    public boolean updateConsoleLog(File dest, InputStream in, LineListener lineListener) throws IOException {
-        File parentFile = dest.getParentFile();
-        parentFile.mkdirs();
-
-        LOGGER.trace("Updating console log [" + dest.getAbsolutePath() + "]");
-
-        char[] data = new char[DEFAULT_CONSOLE_LOG_LINE_BUFFER_SIZE];
-        char[] overflow = new char[DEFAULT_CONSOLE_LOG_LINE_BUFFER_SIZE];
-
-        BufferedWriter writer = null;
-        try {
-            writer = new BufferedWriter(new FileWriter(dest, dest.exists()));
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-            int hasRead, overflowIndex, offset = 0, end;
-            while ((hasRead = reader.read(data, offset, data.length - offset)) != -1) {
-                end = offset + hasRead;
-                overflowIndex = end;
-                for (int i = end; i > 0; i--) {
-                    int index = i - 1;
-                    char c = data[index];
-                    if ('\n' == c) {
-                        break;
-                    }
-                    overflow[index] = data[index];
-                    overflowIndex = index;
-                }
-                if (overflowIndex == 0) {
-                    if (end == data.length) {//realloc if line is bigger than our buffer
-                        data = realloc(data);
-                        overflow = realloc(overflow);
-                        offset = end;
-                        continue;
-                    } else {
-                        overflowIndex = end;
-                        offset = 0;
-                    }
-                }
-                lineListener.copyLine(new CharArraySequence(data, 0, overflowIndex));
-                writer.write(data, 0, overflowIndex);
-                //place overflow back in data
-                for (int i = overflowIndex; i < end; i++) {
-                    data[i - overflowIndex] = overflow[i];
-                }
-                offset = end - overflowIndex;
-            }
-        } catch (IOException e) {
-            LOGGER.error("Failed to update console log at : [" + dest.getAbsolutePath() + "]", e);
-            return false;
-        } finally {
-            if (writer != null) {
-                writer.close();
-            }
-        }
-        if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("Console log [" + dest.getAbsolutePath() + "] saved.");
-        }
-        return true;
-    }
-
-    static class CharArraySequence implements CharSequence {
-        private final char[] chars;
-        private final int start;
-        private final int end;
-
-        CharArraySequence(char[] chars, int start, int end) {
-            this.chars = chars;
-            this.start = start;
-            this.end = end;
-        }
-
-        public int length() {
-            return end;
-        }
-
-        public char charAt(int index) {
-            return chars[start + index];
-        }
-
-        public CharSequence subSequence(int start, int end) {
-            return new CharArraySequence(chars, start, end);
-        }
-
-        @Override
-        public String toString() {
-            return new String(chars, start, end - start);
-        }
-    }
-
-    ConsoleOut getConsoleOut(int startingLine, InputStream inputStream) throws IOException {
-        int lineNumber = 0;
-
-        StringBuffer buffer = new StringBuffer();
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-            String consoleLine;
-            while (null != (consoleLine = reader.readLine())) {
-                if (lineNumber >= startingLine) {
-                    buffer.append(consoleLine);
-                    buffer.append(FileUtil.lineSeparator());
-                }
-                lineNumber++;
-            }
-        } catch (FileNotFoundException ex) {
-            LOGGER.error("Could not read console out: " + ex.getMessage());
-        } finally {
-            inputStream.close();
-        }
-        return new ConsoleOut(buffer.toString(), startingLine, lineNumber);
-    }
-
-    public ConsoleOut getConsoleOut(File logFile, int startingLine) throws IOException {
-        return getConsoleOut(startingLine, new LogFile(logFile).getInputStream());
-    }
-
     public File findArtifact(JobIdentifier identifier, String path) throws IllegalArtifactLocationException {
         return chooser.findArtifact(identifier, path);
     }
@@ -306,7 +173,11 @@ public class ArtifactsService implements ArtifactUrlReader {
 
     public String findArtifactUrl(JobIdentifier jobIdentifier) {
         JobIdentifier actualId = jobResolverService.actualJobIdentifier(jobIdentifier);
-        return getArtifactUrl(actualId.buildLocator());
+        return format("/files/%s", actualId.buildLocator());
+    }
+
+    public String findArtifactUrl(JobIdentifier jobIdentifier, String path) {
+        return format("%s/%s", findArtifactUrl(jobIdentifier), path);
     }
 
     public File getArtifactLocation(String path) throws IllegalArtifactLocationException {
@@ -321,10 +192,6 @@ public class ArtifactsService implements ArtifactUrlReader {
         }
     }
 
-    public String getArtifactUrl(String path) {
-        return "/files/" + path;
-    }
-
     public void purgeArtifactsForStage(Stage stage) {
         StageIdentifier stageIdentifier = stage.getIdentifier();
         try {
@@ -334,14 +201,14 @@ public class ArtifactsService implements ArtifactUrlReader {
             boolean didDelete = deleteArtifactsExceptCruiseOutput(stageRoot);
 
             if (!didDelete) {
-                LOGGER.error(String.format("Artifacts for stage '%s' at path '%s' was not deleted", stageIdentifier.entityLocator(), stageRoot.getAbsolutePath()));
+                LOGGER.error(format("Artifacts for stage '%s' at path '%s' was not deleted", stageIdentifier.entityLocator(), stageRoot.getAbsolutePath()));
             }
         } catch (Exception e) {
-            LOGGER.error(String.format("Error occurred while clearing artifacts for '%s'. Error: '%s'", stageIdentifier.entityLocator(), e.getMessage()), e);
+            LOGGER.error(format("Error occurred while clearing artifacts for '%s'. Error: '%s'", stageIdentifier.entityLocator(), e.getMessage()), e);
         }
-        stageService.markArtifactsDeletedFor(stage);
+        stageDao.markArtifactsDeletedFor(stage);
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug(String.format("Marked stage '%s' as artifacts deleted.", stageIdentifier.entityLocator()));
+            LOGGER.debug(format("Marked stage '%s' as artifacts deleted.", stageIdentifier.entityLocator()));
         }
     }
 
@@ -372,8 +239,4 @@ public class ArtifactsService implements ArtifactUrlReader {
         return FileUtils.deleteQuietly(file);
     }
 
-    public void appendToConsoleLog(JobIdentifier jobIdentifier, String text) throws IllegalArtifactLocationException, IOException {
-        File file = findArtifact(jobIdentifier, ArtifactLogUtil.getConsoleLogOutputFolderAndFileName());
-        updateConsoleLog(file, new ByteArrayInputStream(text.getBytes()), LineListener.NO_OP_LINE_LISTENER);
-    }
 }

@@ -16,36 +16,30 @@
 
 package com.thoughtworks.go.config.materials.svn;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import javax.annotation.PostConstruct;
-
 import com.thoughtworks.go.config.PasswordEncrypter;
 import com.thoughtworks.go.config.materials.PasswordAwareMaterial;
 import com.thoughtworks.go.config.materials.ScmMaterial;
 import com.thoughtworks.go.config.materials.ScmMaterialConfig;
 import com.thoughtworks.go.config.materials.SubprocessExecutionContext;
 import com.thoughtworks.go.domain.MaterialInstance;
-import com.thoughtworks.go.domain.materials.MaterialConfig;
-import com.thoughtworks.go.domain.materials.Modification;
-import com.thoughtworks.go.domain.materials.Revision;
-import com.thoughtworks.go.domain.materials.ValidationBean;
-import com.thoughtworks.go.domain.materials.svn.Subversion;
-import com.thoughtworks.go.domain.materials.svn.SubversionRevision;
-import com.thoughtworks.go.domain.materials.svn.SvnCommand;
-import com.thoughtworks.go.domain.materials.svn.SvnMaterialInstance;
+import com.thoughtworks.go.domain.materials.*;
+import com.thoughtworks.go.domain.materials.svn.*;
 import com.thoughtworks.go.security.GoCipher;
-import com.thoughtworks.go.domain.materials.svn.MaterialUrl;
-import com.thoughtworks.go.util.GoConstants;
 import com.thoughtworks.go.util.FileUtil;
+import com.thoughtworks.go.util.GoConstants;
 import com.thoughtworks.go.util.StringUtil;
 import com.thoughtworks.go.util.command.ProcessOutputStreamConsumer;
 import com.thoughtworks.go.util.command.UrlArgument;
 import org.apache.log4j.Logger;
 import org.bouncycastle.crypto.InvalidCipherTextException;
+
+import javax.annotation.PostConstruct;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static com.thoughtworks.go.util.ExceptionUtils.bomb;
 import static com.thoughtworks.go.util.ExceptionUtils.bombIfNull;
@@ -146,9 +140,7 @@ public class SvnMaterial extends ScmMaterial implements PasswordEncrypter, Passw
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Updating to revision: " + revision + " in workingdirectory " + workingDir);
         }
-        outputStreamConsumer.stdOutput(
-                format("\n[%s] Start updating %s at revision %s from %s", GoConstants.PRODUCT_NAME, updatingTarget(), revision.getRevision(),
-                        url));
+        outputStreamConsumer.stdOutput(format("[%s] Start updating %s at revision %s from %s", GoConstants.PRODUCT_NAME, updatingTarget(), revision.getRevision(), url));
         boolean shouldDoFreshCheckout = !workingDir.isDirectory() || isRepositoryChanged(workingDir);
         if (shouldDoFreshCheckout) {
             freshCheckout(outputStreamConsumer, new SubversionRevision(revision), workingDir);
@@ -156,6 +148,7 @@ public class SvnMaterial extends ScmMaterial implements PasswordEncrypter, Passw
             cleanupAndUpdate(outputStreamConsumer, new SubversionRevision(revision), workingDir);
         }
         LOGGER.debug("done with update");
+        outputStreamConsumer.stdOutput(format("[%s] Done.\n", GoConstants.PRODUCT_NAME));
     }
 
     public boolean isRepositoryChanged(File workingFolder) {
@@ -189,7 +182,9 @@ public class SvnMaterial extends ScmMaterial implements PasswordEncrypter, Passw
         try {
             svn().cleanupAndRevert(outputStreamConsumer, workingFolder);
         } catch (Exception e) {
-            LOGGER.error("Failed to do cleanup and revert in " + workingFolder.getAbsolutePath());
+            String message = "Failed to do cleanup and revert in " + workingFolder.getAbsolutePath();
+            LOGGER.error(message);
+            LOGGER.debug(message, e);
         }
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Updating to revision " + revision + " on " + workingFolder);
@@ -239,6 +234,25 @@ public class SvnMaterial extends ScmMaterial implements PasswordEncrypter, Passw
 
     public String getTypeForDisplay() {
         return "Subversion";
+    }
+
+    @Override
+    public Map<String, Object> getAttributes(boolean addSecureFields) {
+        Map<String, Object> materialMap = new HashMap<String, Object>();
+        materialMap.put("type", "svn");
+        Map<String, Object> configurationMap = new HashMap<String, Object>();
+        if (addSecureFields) {
+            configurationMap.put("url", url.forCommandline());
+        } else {
+            configurationMap.put("url", url.forDisplay());
+        }
+        configurationMap.put("username", userName);
+        if (addSecureFields) {
+            configurationMap.put("password", getPassword());
+        }
+        configurationMap.put("check-externals", checkExternals);
+        materialMap.put("svn-configuration", configurationMap);
+        return materialMap;
     }
 
     public Class getInstanceType() {

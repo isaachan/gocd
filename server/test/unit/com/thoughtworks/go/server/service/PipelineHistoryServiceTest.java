@@ -16,39 +16,16 @@
 
 package com.thoughtworks.go.server.service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-
-import com.thoughtworks.go.config.CaseInsensitiveString;
-import com.thoughtworks.go.helper.*;
-import com.thoughtworks.go.config.ConfigMigrator;
-import com.thoughtworks.go.config.CruiseConfig;
-import com.thoughtworks.go.config.JobConfigs;
-import com.thoughtworks.go.config.MingleConfig;
-import com.thoughtworks.go.config.PipelineConfig;
-import com.thoughtworks.go.config.StageConfig;
-import com.thoughtworks.go.config.TrackingTool;
+import com.thoughtworks.go.config.*;
 import com.thoughtworks.go.config.materials.MaterialConfigs;
-import com.thoughtworks.go.domain.JobResult;
-import com.thoughtworks.go.domain.JobState;
-import com.thoughtworks.go.domain.MaterialRevisions;
-import com.thoughtworks.go.domain.PipelineDependencyGraphOld;
-import com.thoughtworks.go.domain.PipelineTimelineEntry;
-import com.thoughtworks.go.domain.StageIdentifier;
-import com.thoughtworks.go.domain.StageResult;
+import com.thoughtworks.go.domain.*;
 import com.thoughtworks.go.domain.buildcause.BuildCause;
 import com.thoughtworks.go.domain.materials.MaterialConfig;
-import com.thoughtworks.go.presentation.pipelinehistory.JobHistory;
-import com.thoughtworks.go.presentation.pipelinehistory.NullStageHistoryItem;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineGroupModel;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineInstanceModel;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineInstanceModels;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineModel;
-import com.thoughtworks.go.presentation.pipelinehistory.StageInstanceModel;
-import com.thoughtworks.go.presentation.pipelinehistory.StageInstanceModels;
+import com.thoughtworks.go.helper.*;
+import com.thoughtworks.go.i18n.Localizable;
+import com.thoughtworks.go.i18n.LocalizedMessage;
+import com.thoughtworks.go.presentation.PipelineStatusModel;
+import com.thoughtworks.go.presentation.pipelinehistory.*;
 import com.thoughtworks.go.server.dao.PipelineDao;
 import com.thoughtworks.go.server.dao.StageDao;
 import com.thoughtworks.go.server.domain.JobDurationStrategy;
@@ -57,12 +34,22 @@ import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.domain.user.PipelineSelections;
 import com.thoughtworks.go.server.persistence.MaterialRepository;
 import com.thoughtworks.go.server.scheduling.TriggerMonitor;
+import com.thoughtworks.go.server.service.result.HttpLocalizedOperationResult;
 import com.thoughtworks.go.server.service.result.HttpOperationResult;
+import com.thoughtworks.go.server.service.result.ServerHealthStateOperationResult;
+import com.thoughtworks.go.server.service.support.toggle.FeatureToggleService;
+import com.thoughtworks.go.server.service.support.toggle.Toggles;
+import com.thoughtworks.go.server.util.Pagination;
+import com.thoughtworks.go.serverhealth.HealthStateScope;
+import com.thoughtworks.go.serverhealth.HealthStateType;
+import org.apache.commons.httpclient.HttpStatus;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mock;
 
-import static com.thoughtworks.go.helper.PipelineMaterialModificationMother.modification;
+import java.util.*;
+
 import static com.thoughtworks.go.presentation.pipelinehistory.PipelineInstanceModels.createPipelineInstanceModels;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
@@ -71,17 +58,10 @@ import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.mockito.MockitoAnnotations.initMocks;
 
 public class PipelineHistoryServiceTest {
-    private PipelineHistoryService pipelineHistoryService;
-    private PipelineDao pipelineDao;
-    private GoConfigService goConfigService;
-    private SecurityService securityService;
-
     private static final CruiseConfig CRUISE_CONFIG = ConfigMigrator.loadWithMigration("<cruise xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
             + "     xsi:noNamespaceSchemaLocation=\"cruise-config.xsd\" schemaVersion=\"17\" >"
             + "<server artifactsdir=\"target/testfiles/tmpCCRoot/data/logs\"></server>"
@@ -103,29 +83,27 @@ public class PipelineHistoryServiceTest {
             + "    </pipeline>"
             + "  </pipelines>"
             + "</cruise>").config;
-    private ScheduleService scheduleService;
-    private PipelineTimeline pipelineTimeline;
-    private PipelineUnlockApiService pipelineUnlockService;
-    private SchedulingCheckerService schedulingCheckerService;
-    private StageDao stageDao;
+
+    @Mock private StageDao stageDao;
+    @Mock private PipelineDao pipelineDao;
+    @Mock private GoConfigService goConfigService;
+    @Mock private SecurityService securityService;
+    @Mock private ScheduleService scheduleService;
+    @Mock private PipelineTimeline pipelineTimeline;
+    @Mock private PipelineUnlockApiService pipelineUnlockService;
+    @Mock private SchedulingCheckerService schedulingCheckerService;
+    @Mock private PipelineLockService pipelineLockService;
+    @Mock public PipelinePauseService pipelinePauseService;
+    @Mock public FeatureToggleService featureToggleService;
+    private PipelineHistoryService pipelineHistoryService;
     private static final Username USERNAME = new Username(new CaseInsensitiveString("bar"));
     private PipelineConfig config;
-    private PipelineLockService pipelineLockService;
-    public PipelinePauseService pipelinePauseService;
-
 
     @Before
     public void setUp() {
-        pipelineDao = mock(PipelineDao.class);
-        goConfigService = mock(GoConfigService.class);
-        securityService = mock(SecurityService.class);
-        scheduleService = mock(ScheduleService.class);
-        pipelineLockService = mock(PipelineLockService.class);
-        pipelineTimeline = mock(PipelineTimeline.class);
-        pipelineUnlockService = mock(PipelineUnlockApiService.class);
-        schedulingCheckerService = mock(SchedulingCheckerService.class);
-        pipelinePauseService = mock(PipelinePauseService.class);
-        stageDao = mock(StageDao.class);
+        initMocks(this);
+        when(featureToggleService.isToggleOn(Toggles.PIPELINE_COMMENT_FEATURE_TOGGLE_KEY)).thenReturn(true);
+        Toggles.initializeWith(featureToggleService);
         pipelineHistoryService = new PipelineHistoryService(pipelineDao, stageDao, goConfigService, securityService, scheduleService,
                 mock(MaterialRepository.class),
                 JobDurationStrategy.ALWAYS_ZERO,
@@ -826,6 +804,134 @@ public class PipelineHistoryServiceTest {
     public void shouldReturnPageNumberForAPipelineCounter() {
         when(pipelineDao.getPageNumberForCounter("some-pipeline", 100, 10)).thenReturn(1);
         assertThat(pipelineHistoryService.getPageNumberForCounter("some-pipeline", 100, 10), is(1));
+    }
+
+	@Test
+	public void shouldPopulateDataCorrectly_getPipelineStatus() {
+		CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+		PipelineConfig pipelineConfig = new PipelineConfig();
+		when(cruiseConfig.getPipelineConfigByName(new CaseInsensitiveString("pipeline-name"))).thenReturn(pipelineConfig);
+		when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+		when(securityService.hasViewPermissionForPipeline("user-name", "pipeline-name")).thenReturn(true);
+		when(pipelinePauseService.isPaused("pipeline-name")).thenReturn(true);
+		when(pipelineLockService.isLocked("pipeline-name")).thenReturn(true);
+		when(schedulingCheckerService.canManuallyTrigger(eq(pipelineConfig), eq("user-name"), any(ServerHealthStateOperationResult.class))).thenReturn(true);
+
+		PipelineStatusModel pipelineStatus = pipelineHistoryService.getPipelineStatus("pipeline-name", "user-name", new HttpOperationResult());
+
+		assertThat(pipelineStatus.isPaused(), is(true));
+		assertThat(pipelineStatus.isLocked(), is(true));
+		assertThat(pipelineStatus.isSchedulable(), is(true));
+	}
+
+	@Test
+	public void shouldPopulateResultAsNotFound_getPipelineStatus() {
+		CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+		when(cruiseConfig.getPipelineConfigByName(new CaseInsensitiveString("pipeline-name"))).thenReturn(null);
+		when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+
+		HttpOperationResult result = new HttpOperationResult();
+		PipelineStatusModel pipelineStatus = pipelineHistoryService.getPipelineStatus("pipeline-name", "user-name", result);
+
+		assertThat(pipelineStatus, is(nullValue()));
+		assertThat(result.httpCode(), is(404));
+	}
+
+	@Test
+	public void shouldPopulateResultAsUnauthorized_getPipelineStatus() {
+		CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+		PipelineConfig pipelineConfig = new PipelineConfig();
+		when(cruiseConfig.getPipelineConfigByName(new CaseInsensitiveString("pipeline-name"))).thenReturn(pipelineConfig);
+		when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+		when(securityService.hasViewPermissionForPipeline("user-name", "pipeline-name")).thenReturn(false);
+
+		HttpOperationResult result = new HttpOperationResult();
+		PipelineStatusModel pipelineStatus = pipelineHistoryService.getPipelineStatus("pipeline-name", "user-name", result);
+
+		assertThat(pipelineStatus, is(nullValue()));
+		assertThat(result.httpCode(), is(401));
+	}
+
+	@Test
+	public void shouldPopulateResultAsNotFoundWhenPipelineNotFound_loadMinimalData() {
+		String pipelineName = "unknown-pipeline";
+		CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+		when(cruiseConfig.hasPipelineNamed(new CaseInsensitiveString(pipelineName))).thenReturn(false);
+		when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+
+		HttpOperationResult result = new HttpOperationResult();
+		PipelineInstanceModels pipelineInstanceModels = pipelineHistoryService.loadMinimalData(pipelineName, Pagination.pageFor(0, 0, 10), "looser", result);
+
+		assertThat(pipelineInstanceModels, is(nullValue()));
+		assertThat(result.httpCode(), is(404));
+		assertThat(result.detailedMessage(), is("Not Found { Pipeline " + pipelineName + " not found }\n"));
+	}
+
+	@Test
+	public void shouldPopulateResultAsUnauthorizedWhenUserNotAllowedToViewPipeline_loadMinimalData() {
+		String noAccessUserName = "foo";
+		String withAccessUserName = "admin";
+		String pipelineName = "no-access-pipeline";
+		CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+		when(cruiseConfig.hasPipelineNamed(new CaseInsensitiveString(pipelineName))).thenReturn(true);
+		when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+
+		when(securityService.hasViewPermissionForPipeline(noAccessUserName, pipelineName)).thenReturn(false);
+		when(securityService.hasViewPermissionForPipeline(withAccessUserName, pipelineName)).thenReturn(true);
+
+		when(pipelineDao.loadHistory(pipelineName, 10, 0)).thenReturn(PipelineInstanceModels.createPipelineInstanceModels());
+
+		HttpOperationResult result = new HttpOperationResult();
+		PipelineInstanceModels pipelineInstanceModels = pipelineHistoryService.loadMinimalData(pipelineName, Pagination.pageFor(0, 1, 10), noAccessUserName, result);
+
+		assertThat(pipelineInstanceModels, is(nullValue()));
+		assertThat(result.httpCode(), is(401));
+
+		result = new HttpOperationResult();
+		pipelineInstanceModels = pipelineHistoryService.loadMinimalData(pipelineName, Pagination.pageFor(0, 1, 10), withAccessUserName, result);
+
+		assertThat(pipelineInstanceModels, is(not(nullValue())));
+		assertThat(result.canContinue(), is(true));
+	}
+
+    @Test
+    public void shouldUpdateCommentUsingPipelineDao() {
+        CaseInsensitiveString authorizedUser = new CaseInsensitiveString("can-access");
+        HttpLocalizedOperationResult result = new HttpLocalizedOperationResult();
+
+        when(securityService.hasOperatePermissionForPipeline(authorizedUser, "pipeline_name")).thenReturn(true);
+
+        pipelineHistoryService.updateComment("pipeline_name", 1, "test comment", new Username(authorizedUser), result);
+
+        verify(pipelineDao, times(1)).updateComment("pipeline_name", 1, "test comment");
+    }
+
+    @Test
+    public void shouldNotUpdateCommentWhenUserIsUnauthorized() {
+        CaseInsensitiveString unauthorizedUser = new CaseInsensitiveString("cannot-access");
+        String pipelineName = "pipeline_name";
+        when(securityService.hasOperatePermissionForPipeline(unauthorizedUser, pipelineName)).thenReturn(false);
+
+        HttpLocalizedOperationResult result = mock(HttpLocalizedOperationResult.class);
+        pipelineHistoryService.updateComment(pipelineName, 1, "test comment", new Username(unauthorizedUser), result);
+
+        verify(pipelineDao, never()).updateComment(pipelineName, 1, "test comment");
+        verify(result, times(1)).unauthorized(LocalizedMessage.cannotOperatePipeline(pipelineName), HealthStateType.general(HealthStateScope.forPipeline(pipelineName)));
+    }
+
+    @Test
+    public void shouldFailWhenFeatureIsToggledOff_updateComment() {
+        when(featureToggleService.isToggleOn(Toggles.PIPELINE_COMMENT_FEATURE_TOGGLE_KEY)).thenReturn(false);
+        Toggles.initializeWith(featureToggleService);
+        CaseInsensitiveString unauthorizedUser = new CaseInsensitiveString("cannot-access");
+        String pipelineName = "pipeline_name";
+
+        HttpLocalizedOperationResult result = new HttpLocalizedOperationResult();
+        pipelineHistoryService.updateComment(pipelineName, 1, "test comment", new Username(unauthorizedUser), result);
+
+        assertThat(result.httpCode(), is(HttpStatus.SC_NOT_IMPLEMENTED));
+        assertThat((Localizable.CurryableLocalizable) result.localizable(), is(LocalizedMessage.string("FEATURE_NOT_AVAILABLE", "Pipeline Comment")));
+        verify(pipelineDao, never()).updateComment(pipelineName, 1, "test comment");
     }
 
     private void stubConfigServiceToReturnMaterialAndPipeline(String downPipelineName, MaterialConfigs downPipelineMaterial, PipelineConfig down1Config) {

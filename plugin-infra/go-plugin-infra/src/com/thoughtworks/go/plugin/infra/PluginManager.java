@@ -1,5 +1,5 @@
 /*************************GO-LICENSE-START*********************************
- * Copyright 2014 ThoughtWorks, Inc.
+ * Copyright 2015 ThoughtWorks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,12 @@
 
 package com.thoughtworks.go.plugin.infra;
 
-import java.util.List;
-
+import com.thoughtworks.go.plugin.api.GoPluginIdentifier;
+import com.thoughtworks.go.plugin.api.request.GoPluginApiRequest;
+import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginDescriptor;
+
+import java.util.List;
 
 public interface PluginManager {
     List<GoPluginDescriptor> plugins();
@@ -35,9 +38,21 @@ public interface PluginManager {
 
     <T> void doOnIfHasReference(Class<T> serviceReferenceClass, String pluginId, Action<T> action);
 
-    void startPluginInfrastructure();
+    void startInfrastructure();
 
-    void stopPluginInfrastructure();
+    void registerPluginsFolderChangeListener();
+
+    void stopInfrastructure();
 
     void addPluginChangeListener(PluginChangeListener pluginChangeListener, Class<?>... serviceReferenceClass);
+
+    GoPluginApiResponse submitTo(String pluginId, GoPluginApiRequest apiRequest);
+
+    List<GoPluginIdentifier> allPluginsOfType(String extension);
+
+    boolean hasReferenceFor(Class serviceReferenceClass, String pluginId);
+
+    boolean isPluginOfType(String extension, String pluginId);
+
+    String resolveExtensionVersion(String pluginId, List<String> goSupportedExtensionVersions);
 }

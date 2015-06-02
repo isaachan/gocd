@@ -16,14 +16,7 @@
 
 package com.thoughtworks.go.util;
 
-import junit.framework.Assert;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.util.Collection;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -37,6 +30,7 @@ import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
+import org.junit.Assert;
 
 import static com.thoughtworks.go.util.ExceptionUtils.bomb;
 import static java.text.MessageFormat.format;
@@ -178,7 +172,7 @@ public class TestUtils {
         };
     }
 
-    public static void copyAndClose(FileInputStream fileInputStream, FileOutputStream fileOutputStream) {
+    public static void copyAndClose(InputStream fileInputStream, OutputStream fileOutputStream) {
         try {
             IOUtils.copy(fileInputStream, fileOutputStream);
         } catch (IOException e) {

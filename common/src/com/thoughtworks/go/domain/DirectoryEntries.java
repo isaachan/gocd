@@ -16,14 +16,14 @@
 
 package com.thoughtworks.go.domain;
 
-import java.util.ArrayList;
-
-import com.thoughtworks.go.util.json.Json;
-import com.thoughtworks.go.util.json.JsonAware;
-import com.thoughtworks.go.util.json.JsonList;
 import com.thoughtworks.go.server.presentation.html.HtmlElement;
 import com.thoughtworks.go.server.presentation.html.HtmlRenderable;
 import com.thoughtworks.go.server.presentation.models.HtmlRenderer;
+import com.thoughtworks.go.util.json.Json;
+import com.thoughtworks.go.util.json.JsonAware;
+import com.thoughtworks.go.util.json.JsonList;
+
+import java.util.ArrayList;
 
 import static com.thoughtworks.go.server.presentation.html.HtmlElement.p;
 
@@ -32,7 +32,7 @@ public class DirectoryEntries extends ArrayList<DirectoryEntry> implements HtmlR
 
     public void render(HtmlRenderer renderer) {
         if (isArtifactsDeleted || isEmpty()) {
-            HtmlElement element = p().content("Artifacts for this job instance are unavailable as they may have been <a href='/go/help/delete_artifacts.html' target='blank'>purged by Go</a> or deleted externally. "
+            HtmlElement element = p().content("Artifacts for this job instance are unavailable as they may have been <a href='http://www.go.cd/documentation/user/current/configuration/delete_artifacts.html' target='blank'>purged by Go</a> or deleted externally. "
                     + "Re-run the stage or job to generate them again.");
             element.render(renderer);
         }
@@ -56,5 +56,15 @@ public class DirectoryEntries extends ArrayList<DirectoryEntry> implements HtmlR
 
     public void setIsArtifactsDeleted(boolean artifactsDeleted) {
         isArtifactsDeleted = artifactsDeleted;
+    }
+
+    public FolderDirectoryEntry addFolder(String folderName) {
+        FolderDirectoryEntry folderDirectoryEntry = new FolderDirectoryEntry(folderName, "", new DirectoryEntries());
+        add(folderDirectoryEntry);
+        return folderDirectoryEntry;
+    }
+
+    public void addFile(String fileName, String url) {
+        add(new FileDirectoryEntry(fileName, url));
     }
 }

@@ -16,26 +16,14 @@
 
 package com.thoughtworks.go.service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.util.Iterator;
-
+import com.thoughtworks.go.GoConfigRevisions;
 import com.thoughtworks.go.config.exceptions.ConfigFileHasChangedException;
 import com.thoughtworks.go.config.exceptions.ConfigMergeException;
 import com.thoughtworks.go.domain.GoConfigRevision;
-import com.thoughtworks.go.util.FileUtil;
-import com.thoughtworks.go.util.StringUtil;
-import com.thoughtworks.go.util.SystemEnvironment;
-import com.thoughtworks.go.util.ThrowingFn;
-import com.thoughtworks.go.util.VoidThrowingFn;
+import com.thoughtworks.go.util.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
-import org.eclipse.jgit.api.AddCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.LogCommand;
-import org.eclipse.jgit.api.MergeResult;
-import org.eclipse.jgit.api.ResetCommand;
+import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectId;
@@ -48,6 +36,11 @@ import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.Iterator;
 
 import static java.lang.String.format;
 
@@ -116,7 +109,7 @@ public class ConfigRepository {
                 }
             });
         } catch (Exception e) {
-            LOGGER.error(format("[CONFIG SAVE] Check-in failed for %s", rev.toString()));
+            LOGGER.error(format("[CONFIG SAVE] Check-in failed for %s", rev.toString()), e);
             throw e;
         }
     }
@@ -155,6 +148,15 @@ public class ConfigRepository {
         throw new IllegalArgumentException(String.format("There is no config version corresponding to md5: '%s'", md5));
     }
 
+	RevCommit getRevCommitForCommitSHA(String commitSHA) throws GitAPIException {
+		for (RevCommit revision : revisions()) {
+			if (revision.getName().equals(commitSHA)) {
+				return revision;
+			}
+		}
+		throw new IllegalArgumentException(String.format("There is no commit corresponding to SHA: '%s'", commitSHA));
+	}
+
     public GoConfigRevision getCurrentRevision() {
         return doLocked(new ThrowingFn<GoConfigRevision, RuntimeException>() {
             public GoConfigRevision call() {
@@ -175,10 +177,30 @@ public class ConfigRepository {
         try {
             return revisions().iterator().next();
         } catch (GitAPIException e) {
-            LOGGER.error("[CONFIG REPOSITORY] Could not fetch latest commit id");
+            LOGGER.error("[CONFIG REPOSITORY] Could not fetch latest commit id", e);
             throw e;
         }
     }
+
+	public GoConfigRevisions getCommits(final int pageSize, final int offset) throws Exception {
+		return doLocked(new ThrowingFn<GoConfigRevisions, RuntimeException>() {
+			public GoConfigRevisions call() {
+				GoConfigRevisions goConfigRevisions = new GoConfigRevisions();
+				try {
+					LogCommand command = git.log().setMaxCount(pageSize).setSkip(offset);
+					Iterable<RevCommit> revisions = command.call();
+					for (RevCommit revision : revisions) {
+						GoConfigRevision goConfigRevision = new GoConfigRevision(null, revision.getFullMessage());
+						goConfigRevision.setCommitSHA(revision.name());
+						goConfigRevisions.add(goConfigRevision);
+					}
+				} catch (Exception e) {
+					// ignore
+				}
+				return goConfigRevisions;
+			}
+		});
+	}
 
     private GoConfigRevision getGoConfigRevision(final RevCommit revision) {
         return new GoConfigRevision(contentFromTree(revision.getTree()), revision.getFullMessage());
@@ -227,6 +249,22 @@ public class ConfigRepository {
             }
         });
     }
+
+	public String configChangesForCommits(final String fromRevision, final String toRevision) throws GitAPIException {
+		return doLocked(new ThrowingFn<String, GitAPIException>() {
+			public String call() throws GitAPIException {
+				RevCommit laterCommit = null;
+				RevCommit earlierCommit = null;
+				if (!StringUtil.isBlank(fromRevision)) {
+					laterCommit = getRevCommitForCommitSHA(fromRevision);
+				}
+				if (!StringUtil.isBlank(toRevision)) {
+					earlierCommit = getRevCommitForCommitSHA(toRevision);
+				}
+				return findDiffBetweenTwoRevisions(laterCommit, earlierCommit);
+			}
+		});
+	}
 
     String findDiffBetweenTwoRevisions(RevCommit laterCommit, RevCommit earlierCommit) throws GitAPIException {
         if (laterCommit == null || earlierCommit == null) {
@@ -288,7 +326,7 @@ public class ConfigRepository {
         try {
             git.branchCreate().setName(branchName).setStartPoint(revCommit).call();
         } catch (GitAPIException e) {
-            LOGGER.error(String.format("[CONFIG_MERGE] Failed to create branch %s at revision %s", branchName, revCommit.getId()));
+            LOGGER.error(String.format("[CONFIG_MERGE] Failed to create branch %s at revision %s", branchName, revCommit.getId()), e);
             throw e;
         }
     }
@@ -297,7 +335,7 @@ public class ConfigRepository {
         try {
             git.branchDelete().setBranchNames(branchName).setForce(true).call();
         } catch (GitAPIException e) {
-            LOGGER.error(String.format("[CONFIG_MERGE] Failed to delete branch %s", branchName));
+            LOGGER.error(String.format("[CONFIG_MERGE] Failed to delete branch %s", branchName), e);
             throw e;
         }
     }
@@ -308,7 +346,7 @@ public class ConfigRepository {
             checkin(rev);
             return getCurrentRevCommit();
         } catch (Exception e) {
-            LOGGER.error(String.format("[CONFIG_MERGE] Check-in to branch %s failed", branchName));
+            LOGGER.error(String.format("[CONFIG_MERGE] Check-in to branch %s failed", branchName), e);
             throw e;
         }
     }
@@ -335,7 +373,7 @@ public class ConfigRepository {
         try {
             git.checkout().setName(branchName).call();
         } catch (GitAPIException e) {
-            LOGGER.error(format("[CONFIG_MERGE] Checkout to branch %s failed", branchName));
+            LOGGER.error(format("[CONFIG_MERGE] Checkout to branch %s failed", branchName), e);
             throw e;
         }
     }
@@ -348,7 +386,7 @@ public class ConfigRepository {
             deleteBranch(BRANCH_AT_HEAD);
         } catch (Exception e) {
             String currentBranch = git.getRepository().getBranch();
-            LOGGER.error(format("Error while trying to clean up config repository, CurrentBranch: %s \n : \n Message: %s \n StackTrace: %s", currentBranch, e.getMessage(), e.getStackTrace()));
+            LOGGER.error(format("Error while trying to clean up config repository, CurrentBranch: %s \n : \n Message: %s", currentBranch, e.getMessage(), e.getStackTrace()), e);
             throw new RuntimeException(e);
         }
     }

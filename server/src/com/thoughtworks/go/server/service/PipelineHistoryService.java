@@ -16,26 +16,15 @@
 
 package com.thoughtworks.go.server.service;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.thoughtworks.go.config.CaseInsensitiveString;
-import com.thoughtworks.go.config.CruiseConfig;
-import com.thoughtworks.go.config.PipelineConfig;
-import com.thoughtworks.go.config.PipelineConfigs;
-import com.thoughtworks.go.config.StageConfig;
+import com.thoughtworks.go.config.*;
 import com.thoughtworks.go.domain.PipelineDependencyGraphOld;
 import com.thoughtworks.go.domain.PipelineGroups;
 import com.thoughtworks.go.domain.PipelinePauseInfo;
 import com.thoughtworks.go.domain.PipelineTimelineEntry;
 import com.thoughtworks.go.domain.buildcause.BuildCause;
 import com.thoughtworks.go.i18n.LocalizedMessage;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineGroupModel;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineInstanceModel;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineInstanceModels;
-import com.thoughtworks.go.presentation.pipelinehistory.PipelineModel;
-import com.thoughtworks.go.presentation.pipelinehistory.StageInstanceModel;
-import com.thoughtworks.go.presentation.pipelinehistory.StageInstanceModels;
+import com.thoughtworks.go.presentation.PipelineStatusModel;
+import com.thoughtworks.go.presentation.pipelinehistory.*;
 import com.thoughtworks.go.server.dao.PipelineDao;
 import com.thoughtworks.go.server.dao.StageDao;
 import com.thoughtworks.go.server.domain.JobDurationStrategy;
@@ -47,11 +36,16 @@ import com.thoughtworks.go.server.scheduling.TriggerMonitor;
 import com.thoughtworks.go.server.service.result.HttpLocalizedOperationResult;
 import com.thoughtworks.go.server.service.result.HttpOperationResult;
 import com.thoughtworks.go.server.service.result.OperationResult;
+import com.thoughtworks.go.server.service.result.ServerHealthStateOperationResult;
+import com.thoughtworks.go.server.service.support.toggle.Toggles;
 import com.thoughtworks.go.server.util.Pagination;
 import com.thoughtworks.go.serverhealth.HealthStateScope;
 import com.thoughtworks.go.serverhealth.HealthStateType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class PipelineHistoryService implements PipelineInstanceLoader {
@@ -135,6 +129,54 @@ public class PipelineHistoryService implements PipelineInstanceLoader {
         addEmptyPipelineInstanceIfNeeded(pipelineName, history, new Username(new CaseInsensitiveString(username)), pipelineConfig, populateCanRun);
         return history;
     }
+
+	/*
+	 * Load just enough data for Pipeline History API. The API is complete enough to build Pipeline History Page. Does following:
+	 * Exists check, Authorized check, Loads paginated pipeline data, Populates build-cause,
+	 * Populates future stages as empty, Populates can run for pipeline & each stage, Populate stage run permission
+	 */
+	public PipelineInstanceModels loadMinimalData(String pipelineName, Pagination pagination, String username, OperationResult result) {
+		if (!goConfigService.currentCruiseConfig().hasPipelineNamed(new CaseInsensitiveString(pipelineName))) {
+			result.notFound("Not Found", "Pipeline " + pipelineName + " not found", HealthStateType.general(HealthStateScope.GLOBAL));
+			return null;
+		}
+		if (!securityService.hasViewPermissionForPipeline(username, pipelineName)) {
+			result.unauthorized("Unauthorized", NOT_AUTHORIZED_TO_VIEW_PIPELINE, HealthStateType.general(HealthStateScope.forPipeline(pipelineName)));
+			return null;
+		}
+
+		PipelineInstanceModels history = pipelineDao.loadHistory(pipelineName, pagination.getPageSize(), pagination.getOffset());
+
+		Username usernameObj = new Username(new CaseInsensitiveString(username));
+
+		for (PipelineInstanceModel pipelineInstanceModel : history) {
+			populateMaterialRevisionsOnBuildCause(pipelineInstanceModel);
+
+			populatePlaceHolderStages(pipelineInstanceModel);
+			populateCanRunStatus(usernameObj, pipelineInstanceModel);
+			populateStageOperatePermission(pipelineInstanceModel, usernameObj);
+		}
+
+		return history;
+	}
+
+	public PipelineStatusModel getPipelineStatus(String pipelineName, String username, OperationResult result) {
+		PipelineConfig pipelineConfig = goConfigService.currentCruiseConfig().getPipelineConfigByName(new CaseInsensitiveString(pipelineName));
+		if (pipelineConfig == null) {
+			result.notFound("Not Found", "Pipeline not found", HealthStateType.general(HealthStateScope.GLOBAL));
+			return null;
+		}
+		if (!securityService.hasViewPermissionForPipeline(username, pipelineName)) {
+			result.unauthorized("Unauthorized", NOT_AUTHORIZED_TO_VIEW_PIPELINE, HealthStateType.general(HealthStateScope.forPipeline(pipelineName)));
+			return null;
+		}
+
+		boolean isPaused = pipelinePauseService.isPaused(pipelineName);
+		boolean isCurrentlyLocked = pipelineLockService.isLocked(pipelineName);
+		boolean isSchedulable = schedulingCheckerService.canManuallyTrigger(pipelineConfig, username, new ServerHealthStateOperationResult());
+
+		return new PipelineStatusModel(isPaused, isCurrentlyLocked, isSchedulable);
+	}
 
     private void populatePipelineInstanceModel(Username username, boolean populateCanRun, PipelineConfig pipelineConfig, PipelineInstanceModel pipelineInstanceModel) {
         populatePipelineInstanceModel(pipelineConfig, pipelineInstanceModel);
@@ -560,6 +602,19 @@ public class PipelineHistoryService implements PipelineInstanceLoader {
 
     private void populateMaterialRevisionsOnBuildCause(PipelineInstanceModel model) {
         model.setMaterialRevisionsOnBuildCause(materialRepository.findMaterialRevisionsForPipeline(model.getId()));
+    }
+
+    public void updateComment(String pipelineName, int pipelineCounter, String comment, Username username, HttpLocalizedOperationResult result) {
+        if (!Toggles.isToggleOn(Toggles.PIPELINE_COMMENT_FEATURE_TOGGLE_KEY)) {
+            result.notImplemented(LocalizedMessage.string("FEATURE_NOT_AVAILABLE", "Pipeline Comment"));
+            return;
+        }
+
+        if (securityService.hasOperatePermissionForPipeline(username.getUsername(), pipelineName)) {
+            pipelineDao.updateComment(pipelineName, pipelineCounter, comment);
+        } else {
+            result.unauthorized(LocalizedMessage.cannotOperatePipeline(pipelineName), HealthStateType.general(HealthStateScope.forPipeline(pipelineName)));
+        }
     }
 
     private static class PipelineGroupModels {

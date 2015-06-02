@@ -25,15 +25,18 @@
     <script language="JavaScript" type="text/javascript" src="../app/jsUnitCore.js"></script>
     <script language="JavaScript" type="text/javascript" src="../app/jsUnitVersionCheck.js"></script>
     <script language="JavaScript" type="text/javascript" src="../compressed/all.js"></script>
+    <script language="JavaScript" type="text/javascript" src="../compressed/test_helper.js"></script>
 <script type="text/javascript" src="../app/after_load_enhancements.js"></script>
 
     <script language="JavaScript" type="text/javascript">
-        function context_path(path){
-            return '/go' + path;
-        }
+
         function setUp() {
             window.tabsManager = new TabsManager();
+            contextPath = "/go";
+        }
 
+        function tearDown() {
+            contextPath = undefined;
         }
         function test_should_expand_the_directory() {
             var expectedId = "dashboard_download_project1_log123.xml_abc";

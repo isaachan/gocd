@@ -363,7 +363,7 @@
 
     <select id="allCompletedStages" resultMap="stage-feed-entry">
         <include refid="selectForFeed"/>
-        WHERE completedByTransitionId IS NOT NULL 
+        WHERE completedByTransitionId IS NOT NULL
         ORDER BY completedByTransitionId DESC
         LIMIT #pageLimit#
     </select>
@@ -538,6 +538,26 @@
           AND id > #id#
         ORDER BY id
         LIMIT #limit#
+    </select>
+
+    <select id="getDetailedStageHistory" resultMap="stage-with-job-history">
+        SELECT pipelines.name as pipelineName, pipelines.counter as pipelineCounter, pipelines.label as pipelineLabel,
+        stages.name as stageName, stages.counter as stageCounter, stages.id as stageId, stages.approvedBy as approvedBy,
+        stages.approvalType as approvalType, stages.result as stageResult, stages.rerunOfCounter,
+        builds.id as buildId, builds.name as buildName, builds.state as buildState, builds.result as buildResult, builds.scheduledDate as scheduledDate
+        FROM stages
+        JOIN pipelines ON pipelines.id = stages.pipelineId
+        INNER JOIN builds ON stages.id = builds.stageId AND builds.ignored != true
+        WHERE stages.id IN (
+            SELECT
+            id
+            FROM _stages
+            WHERE name = #stageName#
+            AND pipelineName = #pipelineName#
+            ORDER BY id DESC
+            LIMIT #limit# OFFSET #offset#
+        )
+        ORDER BY stages.id DESC
     </select>
 
     <select id="allPassedStagesByName" resultMap="select-stage-with-identifier-jobs">

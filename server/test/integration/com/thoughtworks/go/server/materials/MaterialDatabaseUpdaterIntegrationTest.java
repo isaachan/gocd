@@ -26,6 +26,8 @@ import com.thoughtworks.go.config.materials.git.GitMaterial;
 import com.thoughtworks.go.domain.materials.Material;
 import com.thoughtworks.go.domain.materials.Modification;
 import com.thoughtworks.go.domain.materials.git.GitTestRepo;
+import com.thoughtworks.go.plugin.access.packagematerial.PackageAsRepositoryExtension;
+import com.thoughtworks.go.plugin.access.scm.SCMExtension;
 import com.thoughtworks.go.server.cache.GoCache;
 import com.thoughtworks.go.server.dao.DatabaseAccessHelper;
 import com.thoughtworks.go.server.persistence.MaterialRepository;
@@ -36,7 +38,6 @@ import com.thoughtworks.go.server.service.SecurityService;
 import com.thoughtworks.go.server.transaction.TransactionCallback;
 import com.thoughtworks.go.server.transaction.TransactionTemplate;
 import com.thoughtworks.go.serverhealth.ServerHealthService;
-import com.thoughtworks.go.plugin.infra.PluginManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -62,13 +63,15 @@ public class MaterialDatabaseUpdaterIntegrationTest {
     @Autowired private GoCache goCache;
     @Autowired private DependencyMaterialUpdater dependencyMaterialUpdater;
     @Autowired private PackageMaterialUpdater packageMaterialUpdater;
+    @Autowired private PluggableSCMMaterialUpdater pluggableSCMMaterialUpdater;
     @Autowired private MaterialExpansionService materialExpansionService;
     @Autowired private LegacyMaterialChecker materialChecker;
     @Autowired private SubprocessExecutionContext subprocessExecutionContext;
     @Autowired private MaterialService materialService;
     @Autowired private GoConfigService goConfigService;
     @Autowired private SecurityService securityService;
-    @Autowired private PluginManager pluginManager;
+    @Autowired private PackageAsRepositoryExtension packageAsRepositoryExtension;
+    @Autowired private SCMExtension scmExtension;
 
     private GitTestRepo testRepo;
     private MaterialDatabaseUpdaterIntegrationTest.TransactionTemplateWithInvocationCount transactionTemplateWithInvocationCount;
@@ -78,13 +81,12 @@ public class MaterialDatabaseUpdaterIntegrationTest {
         dbHelper.onSetUp();
         testRepo = new GitTestRepo();
 
-        MaterialService slowMaterialService = new MaterialServiceWhichSlowsDownFirstTimeModificationCheck(materialRepository, goConfigService, securityService, pluginManager);
+        MaterialService slowMaterialService = new MaterialServiceWhichSlowsDownFirstTimeModificationCheck(materialRepository, goConfigService, securityService, packageAsRepositoryExtension, scmExtension);
         LegacyMaterialChecker materialChecker = new LegacyMaterialChecker(slowMaterialService, subprocessExecutionContext);
         ScmMaterialUpdater scmMaterialUpdater = new ScmMaterialUpdater(materialRepository, materialChecker, subprocessExecutionContext, slowMaterialService);
         transactionTemplateWithInvocationCount = new TransactionTemplateWithInvocationCount(transactionTemplate);
         updater = new MaterialDatabaseUpdater(materialRepository, serverHealthService, transactionTemplateWithInvocationCount, goCache, dependencyMaterialUpdater,
-                scmMaterialUpdater, packageMaterialUpdater,
-                materialExpansionService);
+                scmMaterialUpdater, packageMaterialUpdater, pluggableSCMMaterialUpdater, materialExpansionService);
     }
 
     @After
@@ -139,8 +141,8 @@ public class MaterialDatabaseUpdaterIntegrationTest {
 
     private class MaterialServiceWhichSlowsDownFirstTimeModificationCheck extends MaterialService {
         public MaterialServiceWhichSlowsDownFirstTimeModificationCheck(MaterialRepository materialRepository, GoConfigService goConfigService, SecurityService securityService,
-                                                                       PluginManager pluginManager) {
-            super(materialRepository, goConfigService, securityService, pluginManager);
+                                                                       PackageAsRepositoryExtension packageAsRepositoryExtension, SCMExtension scmExtension) {
+            super(materialRepository, goConfigService, securityService, packageAsRepositoryExtension, scmExtension, transactionTemplate);
         }
 
         @Override

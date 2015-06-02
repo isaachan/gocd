@@ -15,68 +15,23 @@
 ##########################GO-LICENSE-END##################################
 
 require 'securerandom'
-$LOAD_PATH << File.join("webapp/WEB-INF/rails/vendor/rails/activesupport/lib")
-require 'active_support'
 require 'rubygems'
-
-# Backport of missing SecureRandom methods from 1.9 - http://softover.com/UUID_in_Ruby_1.8
-module SecureRandom
-  class << self
-    def method_missing(method_sym, *arguments, &block)
-      case method_sym
-        when :urlsafe_base64
-          r19_urlsafe_base64(*arguments)
-        when :uuid
-          r19_uuid(*arguments)
-        else
-          super
-      end
-    end
-
-    private
-    def r19_urlsafe_base64(n=nil, padding=false)
-      s = [random_bytes(n)].pack("m*")
-      s.delete!("\n")
-      s.tr!("+/", "-_")
-      s.delete!("=") if !padding
-      s
-    end
-
-    def r19_uuid
-      ary = random_bytes(16).unpack("NnnnnN")
-      ary[2] = (ary[2] & 0x0fff) | 0x4000
-      ary[3] = (ary[3] & 0x3fff) | 0x8000
-      "%08x-%04x-%04x-%04x-%04x%08x" % ary
-    end
-  end
-end
-
-# active support
-ActiveSupport.use_standard_json_time_format = true
-ActiveSupport.escape_html_entities_in_json = false
 
 # prepare webapp
 VERSION_NUMBER = ENV["VERSION_NUMBER"]
 RELEASE_COMMIT = ENV["RELEASE_COMMIT"]
 
 task :prepare_webapp do
-  #prepare help docs
-  task('generate_help_documents').invoke unless ENV['BUILD_DOC'] == 'no'
+  if ENV['SKIP_WAR'] == 'Y'
+    safe_cp "test-resources/web.xml", "target/webapp/WEB-INF"
+    puts "INFO: skipping war packaging"
+    next
+  end
 
   #copy
   task('copy_files').invoke
 
-  # js
-  task('create_all_js').invoke
-  task('copy_compressed_js_to_webapp').invoke
-
-  # css
-  task('pull_latest_sass').invoke
-
-  task('version-image-urls-in-css').invoke
-
-  task('create_all_css').invoke
-  task('copy_compressed_css_to_webapp').invoke
+  task('handle_assets').invoke
 
   # rails
   task('copy-code-to-be-interpolated').invoke
@@ -88,23 +43,17 @@ task :prepare_webapp do
   task('change_rails_env_to_production').invoke
 end
 
-#prepare help docs
-task :generate_help_documents do
-  plugin_api_target_dir = "../plugin-infra/go-plugin-api/target/"
-  api_doc_files=[]
-  Dir.glob(plugin_api_target_dir+'/*current.jar') do |file_name|
-    api_doc_files << file_name
-  end
-  api_doc_files << File.join(plugin_api_target_dir, "javadoc")
-  api_doc_files << File.join(plugin_api_target_dir, "classes/plugin-descriptor.xsd")
-  api_doc_files << File.join("..", "plugin-infra", "sample-plugins", "target", "go-sample-plugins.zip")
+task :handle_assets_rails4 do
+  rm_rf("target/webapp/WEB-INF/rails.new/tmp")
+  task('precompile_assets').invoke
+  assets_location_in_target = "target/webapp/WEB-INF/rails.new/public/assets"
+  rm_rf assets_location_in_target if File.exist? assets_location_in_target
+  cp_r "webapp/WEB-INF/rails.new/public/assets", "target/webapp/WEB-INF/rails.new/public/"
+  rm_rf "target/webapp/WEB-INF/rails.new/app/assets"
+end
 
-  ruby = File.expand_path('../../tools/jruby/bin', __FILE__) + (Gem.win_platform? ? '/jruby.bat' : '/jruby')
-  sh "cd #{File.join("../helper/")} && #{ruby} -S rake site build_sitemap"
-
-  require 'fileutils'
-  FileUtils::mkdir_p(File.join("../helper/build/resources"))
-  cp_r api_doc_files, File.join("../helper", "build/resources")
+task :handle_assets do
+  task('handle_assets_rails4').invoke
 end
 
 #copy
@@ -114,17 +63,11 @@ CRUISE_VERSION_FILE = "target/webapp/WEB-INF/classes/ui/navigation/cruise_versio
 task :copy_files do
   safe_cp "webapp", "target"
 
-  FileUtils.remove_dir("target/webapp/WEB-INF/rails/spec", true)
-  FileUtils.remove_dir("target/webapp/WEB-INF/rails/vendor/rspec-1.2.8", true)
-  FileUtils.remove_dir("target/webapp/WEB-INF/rails/vendor/rspec-rails-1.2.7.1", true)
+  FileUtils.remove_dir("target/webapp/WEB-INF/rails.new/spec", true)
 
   cp "messages/message.properties", "target/webapp"
   cp "../config/config-server/resources/cruise-config.xsd", "target/webapp"
 
-  if File.directory?("../helper/build")
-    safe_cp "../helper/build/", "target/webapp/"
-    FileUtils.mv "target/webapp/build", "target/webapp/help"
-  end
 end
 
 task :write_revision_number do
@@ -135,100 +78,70 @@ task :write_revision_number do
   end
 end
 
-# javascript optimization
-JS_PATTERNS_TO_BE_COMPRESSED_IN_ORDER = ["es5-shim.js", "jquery.js", "jquery.timeago.js", "jquery.url.js", "jquery_no_conflict.js", "prototype.js", "scriptaculous.js", "bootstrap.min.js", "angular.1.0.8.min.js", "angular-resource.1.0.8.min.js", "build_base_observer.js", "effects.js", "json_to_css.js", "util.js", "micro_content_popup.js", "ajax_popup_handler.js", "stage_detail.js", "compare_pipelines.js", "*.js"]
-JS_PATTERNS_NOT_TO_BE_COMPRESSED = ["d3.js", "Tooltip.js", "Tooltip_ext.js"]
-JS_PATTERNS_NOT_TO_BE_FORCE_APPENDED = ["inplace-editor.js"]
-COMPRESSED_ALL_DOT_JS = "target/all.js"
-
-task :create_all_js do
-  js_files_to_be_compressed = JS_PATTERNS_TO_BE_COMPRESSED_IN_ORDER.inject([]) do |to_be_compressed, wildcard|
-    matched_paths = expand_js_wildcard(wildcard)
-    to_be_compressed + matched_paths.sort { |first, second| File.basename(first) <=> File.basename(second) }
+def create_pathing_jar classpath_file
+  pathing_jar = File.expand_path(File.join(File.dirname(classpath_file), "pathing.jar"))
+  manifest_file = File.expand_path(File.join(File.dirname(classpath_file), "MANIFEST.MF"))
+  rm manifest_file if File.exists? manifest_file
+  rm pathing_jar if File.exist? pathing_jar
+  classpath_contents = File.read(classpath_file).split(File::PATH_SEPARATOR)
+  to_be_written = ''
+  classpath_contents.each_with_index do |entry, i|
+    to_be_written += "\r\n \\" + entry + '\\ ' if File.directory? entry
+    to_be_written += "\r\n \\" + entry + ' ' unless File.directory? entry
   end
-
-  js_files_to_be_compressed = JS_PATTERNS_NOT_TO_BE_COMPRESSED.inject(js_files_to_be_compressed) do |to_be_compressed, wildcard|
-    to_be_compressed - expand_js_wildcard(wildcard)
+  File.open(manifest_file, 'w') do |f|
+    f.write("Class-Path: #{to_be_written}")
+    f.write("\r\n")
   end
-
-  js_files_to_be_compressed = JS_PATTERNS_NOT_TO_BE_FORCE_APPENDED.inject(js_files_to_be_compressed) do |to_be_compressed, wildcard|
-    matched_files = expand_js_wildcard(wildcard)
-    (to_be_compressed - matched_files) + matched_files
+  raise "File not found: #{manifest_file}" unless File.exists? manifest_file
+  sh "jar cmf #{manifest_file} #{pathing_jar}"
+  pathing_jar
+end
+def set_classpath
+  server_test_dependency_file_path = File.expand_path(File.join(File.dirname(__FILE__), "target", "server-test-dependencies"))
+  if Gem.win_platform?
+    classpath = create_pathing_jar server_test_dependency_file_path
+  else
+    classpath = File.read(server_test_dependency_file_path)
   end
-
-  File.open(COMPRESSED_ALL_DOT_JS, "w") do |h|
-    js_files_to_be_compressed.uniq.each do |path|
-      contents = File.read(path)
-      name = File.basename(path)
-      h.puts "// #{name} - start"
-      h.write(contents)
-      h.puts ";\n// #{name} - end"
-    end
-  end
+  ENV['CLASSPATH'] = classpath
 end
 
-task :copy_compressed_js_to_webapp do
-  safe_cp COMPRESSED_ALL_DOT_JS, "target/webapp/compressed"
-  cp "target/webapp/javascripts/d3.js", "target/webapp/compressed"
-  FileUtils.remove_dir("target/webapp/javascripts", true)
+def ruby_executable
+  File.expand_path(File.join(File.dirname(__FILE__), "..", "tools", "bin", (Gem.win_platform? ? 'jruby.bat' : 'jruby')))
 end
 
-def expand_js_wildcard wildcard
-  Dir.glob("target/webapp/javascripts/" + wildcard)
-end
-
-# css optimization
-CSS_DIRS = ["target/webapp/css", "target/webapp/stylesheets"]
-COMPRESSED_ALL_DOT_CSS = ["target/plugins.css", "target/patterns.css", "target/views.css", "target/css_sass.css"]
-CSS_TO_BE_COMPRESSED = ["plugins/*.css", "patterns/*.css", "views/*.css", "css_sass/**/*.css"]
-
-def expand_css_wildcard wildcard
-  Dir.glob("target/webapp/stylesheets/" + wildcard)
-end
-
-task :pull_latest_sass do
-  # Clear css_sass folder before regenerating new css files
-  FileUtils.remove_dir("target/webapp/stylesheets/css_sass", true)
-  sh "cd target/webapp/sass && sass --update .:../stylesheets/css_sass"
-  FileUtils.remove_dir("target/webapp/sass", true)
-end
-
-task :create_all_css do
-  CSS_TO_BE_COMPRESSED.each_with_index do |wildcard, index|
-    matched_paths = expand_css_wildcard(wildcard)
-    File.open(COMPRESSED_ALL_DOT_CSS[index], "w") do |h|
-      matched_paths.each do |path|
-        contents = File.read(path)
-        name = File.basename(path)
-        h.puts "/* #{name} - start */"
-        h.write(contents)
-        h.puts "\n/* #{name} - end */"
-      end
-    end
+task :precompile_assets do
+  ruby = ruby_executable
+  set_classpath
+  if Gem.win_platform?
+    ENV['RAILS_ENV'] = "production"
+    sh <<END
+    cd #{File.expand_path(File.join(File.dirname(__FILE__), "webapp", "WEB-INF", "rails.new"))} && #{ruby} -S rake assets:clobber assets:precompile
+END
+  else
+    sh "cd #{File.join("webapp/WEB-INF/rails.new")} && RAILS_ENV=production #{ruby} -S rake assets:clobber assets:precompile"
   end
 end
 
-task :copy_compressed_css_to_webapp do
-  COMPRESSED_ALL_DOT_CSS.each do |file|
-    name = File.basename(file).gsub(File.extname(file), '')
-    cp file, "target/webapp/stylesheets/#{name}"
-  end
-end
-
-#image optimization
-task "version-image-urls-in-css" do
-  CSS_DIRS.each do |css_dir|
-    Dir.glob File.join(css_dir, '*', '*.css') do |file|
-      content = File.read(file).gsub /url\(['"\s]*([^\)"'\s]+)['"\s]*\)/, "url(\\1?#{VERSION_NUMBER})"
-      File.open(file, 'w') do |f|
-        f.write(content)
-      end
-    end
+task :jasmine_tests do
+  ruby = ruby_executable
+  ENV['RAILS_ENV'] = "test"
+  ENV['REPORTERS'] = "console,junit"
+  set_classpath
+  if Gem.win_platform?
+    sh <<END
+    cd #{File.expand_path(File.join(File.dirname(__FILE__), "webapp", "WEB-INF", "rails.new"))} && #{ruby} -S rake spec:javascript
+END
+  else
+    sh "cd #{File.join("webapp/WEB-INF/rails.new")} && #{ruby} -S rake spec:javascript"
   end
 end
 
 # inline partials
-RAILS_VIEWS_SRC = "target/webapp/WEB-INF/rails/app/views"
+RAILS_DIR = "rails.new"
+RAILS_ROOT = "target/webapp/WEB-INF/" + RAILS_DIR
+RAILS_VIEWS_SRC = RAILS_ROOT + "/app/views"
 RAILS_INTERPOLATED_VIEWS = "target/rails_views/views"
 
 def inline_partials dir = RAILS_INTERPOLATED_VIEWS
@@ -252,25 +165,30 @@ def render_args call
   args_of_fn('render', call)
 end
 
-#:locals => ({:scope => expr})
-#:locals => ({:scope => ({foo => bar}).merge(:baz => quux)})
-#:object =>
-
-def locals_hash call
+def locals_hash file, call
   render_arguments = render_args(call)
-  scope_map = render_arguments.scan(/:locals\s*=>\s*\{\s*:scope\s*=>\s*(.*?)\s*\}\s*\Z/m)
-  scope_map.flatten[0]
+  scope_map = render_arguments.scan(/:locals\s*=>\s*\{\s*:scope\s*=>\s*(.*?)\s*\}[\s)]*\Z/m)
+  locals_hash_value = scope_map.flatten[0]
+
+  parser_says_there_are_no_locals = locals_hash_value.nil?
+  probably_has_locals = render_arguments =~ /locals.*scope/
+  scope_is_not_empty = render_arguments !~ /:locals\s*=>\s*:scope\s*=>\s*\{\s*\}/
+  if parser_says_there_are_no_locals && probably_has_locals && scope_is_not_empty
+    raise "ERROR: Inlining partials of #{file}. Parser says there are no locals here: #{call}"
+  end
+
+  locals_hash_value
 end
 
 def inline_partial_render_calls file, depth
-  inline_render_calls(File.read(file), file, /<%=\s*render\s*\:partial.*?%>/m, depth)
+  inline_render_calls(File.read(file), file, /<%=\s*render[\s(]*\:partial.*?%>/m, depth)
 end
 
 def inline_render_calls buffer, file, scanned_by, depth
   render_partial_calls = buffer.scan(scanned_by)
   render_partial_calls.each do |call|
     ruby_code = erb_ruby(call)
-    local_hash = locals_hash(call)
+    local_hash = locals_hash(file, call)
     partial_path = ruby_code.scan(/\:partial\s*=>\s*("|')(.+?)\1/m).flatten[1] #make me locals style
     partial_path = (partial_path =~ /\//m ? File.join(RAILS_INTERPOLATED_VIEWS, File.dirname(partial_path), "_" + File.basename(partial_path)) : File.join(File.dirname(file), "_" + File.basename(partial_path)))
     actual_partial_path = actual_partial_path(partial_path)
@@ -297,7 +215,7 @@ def actual_partial_path partial_path
 end
 
 def inline_json_render_calls buffer, file, depth
-  buffer = inline_render_calls(buffer, file, /<%=\s*render_json\s*\:partial.*?%>/m, depth) do |sub_buffer|
+  buffer = inline_render_calls(buffer, file, /<%=\s*render_json[\s(]*\:partial.*?%>/m, depth) do |sub_buffer|
     placeholder_map = {}
     sub_buffer.scan(/<%.*?%>/m).flatten.each do |match_ruby|
       key = SecureRandom.uuid
@@ -344,7 +262,7 @@ end
 
 task :copy_inlined_erbs_to_webapp do
   FileUtils.remove_dir(RAILS_VIEWS_SRC, true)
-  safe_cp RAILS_INTERPOLATED_VIEWS, "target/webapp/WEB-INF/rails/app"
+  safe_cp RAILS_INTERPOLATED_VIEWS, RAILS_ROOT + "/app"
 end
 
 # misc
@@ -364,7 +282,7 @@ class NotInProduction
   end
 end
 
-SANITIZE_FOR_PRODUCTION = NotInProduction.new('target/webapp', {'WEB-INF/rails/config' => 'routes.rb', 'WEB-INF/rails/app/controllers' => ['users_controller.rb'], 'WEB-INF/rails/app/controllers/admin' => 'backup_controller.rb'})
+SANITIZE_FOR_PRODUCTION = NotInProduction.new('target/webapp', {"WEB-INF/#{RAILS_DIR}/config" => 'routes.rb', "WEB-INF/#{RAILS_DIR}/app/controllers/admin" => ['users_controller.rb'], "WEB-INF/#{RAILS_DIR}/app/controllers/admin" => 'backup_controller.rb'})
 
 task :change_rails_env_to_production do
   replace_content_in_file("target/webapp/WEB-INF/web.xml", "<param-value>development</param-value>", "<param-value>production</param-value>")

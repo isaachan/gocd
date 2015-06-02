@@ -112,7 +112,7 @@ public class DbMigrationTest {
         h2Database = new H2Database(dbFixture.env());
 
         h2Database.startDatabase();
-        
+
         DatabaseFixture.update("ALTER TABLE STAGES ADD COLUMN `ARTIFACTSDELETED` Boolean DEFAULT FALSE NOT NULL", h2Database);
         assertThat(DatabaseFixture.query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE COLUMN_NAME='ARTIFACTSDELETED' AND TABLE_NAME='STAGES' AND TABLE_SCHEMA='PUBLIC'", h2Database),
                 is(new Object[][]{{1L}}));
@@ -121,6 +121,74 @@ public class DbMigrationTest {
         }catch (Exception e) {
             fail("should not throw up");
         }
+    }
+
+    @Test
+    @RunIf(value = DatabaseChecker.class, arguments = {DatabaseChecker.H2})
+    public void testMigration_1501001_should_rename_pipelineselections_unselected_pipelines_to_selections() throws Exception {
+        dbFixture.copyDeltas();
+        dbFixture.copyH2Db("with-usernames-in-different-cases.zip");
+        h2Database = new H2Database(dbFixture.env());
+
+        h2Database.startDatabase();
+        h2Database.upgrade();
+
+        doesNotHaveColumn("PIPELINESELECTIONS", "UNSELECTEDPIPELINES");
+        hasColumn("PIPELINESELECTIONS", "SELECTIONS");
+    }
+
+    @Test
+    @RunIf(value = DatabaseChecker.class, arguments = {DatabaseChecker.H2})
+    public void testMigration_1501001_add_column_isblacklist_to_pipelineselections() throws Exception {
+        dbFixture.copyDeltas();
+        dbFixture.copyH2Db("with-usernames-in-different-cases.zip");
+        h2Database = new H2Database(dbFixture.env());
+
+        h2Database.startDatabase();
+
+        doesNotHaveColumn("PIPELINESELECTIONS", "ISBLACKLIST");
+
+        h2Database.upgrade();
+
+        hasColumn("PIPELINESELECTIONS", "ISBLACKLIST");
+        columnHasType("PIPELINESELECTIONS", "ISBLACKLIST", "BOOLEAN");
+        columnHasDefault("PIPELINESELECTIONS", "ISBLACKLIST", "TRUE");
+    }
+
+    @Test
+    @RunIf(value = DatabaseChecker.class, arguments = {DatabaseChecker.H2})
+    public void testMigration_1501002_should_add_comment_column_to_pipelines() throws Exception {
+        dbFixture.copyDeltas();
+        dbFixture.copyH2Db("with-usernames-in-different-cases.zip");
+
+        h2Database = new H2Database(dbFixture.env());
+        h2Database.startDatabase();
+
+        doesNotHaveColumn("PIPELINES", "COMMENT");
+
+        h2Database.upgrade();
+
+        hasColumn("PIPELINES", "COMMENT");
+    }
+
+    private void columnHasDefault(String table, String column, String defaultValue) {
+        assertThat(DatabaseFixture.query(String.format("SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE COLUMN_NAME='%s' AND TABLE_NAME='%s' AND TABLE_SCHEMA='PUBLIC'", column, table), h2Database),
+                is(new Object[][]{{defaultValue}}));
+    }
+
+    private void columnHasType(String table, String column, String type) {
+        assertThat(DatabaseFixture.query(String.format("SELECT TYPE_NAME FROM information_schema.COLUMNS WHERE COLUMN_NAME='%s' AND TABLE_NAME='%s' AND TABLE_SCHEMA='PUBLIC'", column, table), h2Database),
+                is(new Object[][]{{type}}));
+    }
+
+    private void hasColumn(String table, String column) {
+        assertThat(DatabaseFixture.query(String.format("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE COLUMN_NAME='%s' AND TABLE_NAME='%s' AND TABLE_SCHEMA='PUBLIC'", column, table), h2Database),
+                is(new Object[][]{{1L}}));
+    }
+
+    private void doesNotHaveColumn(String table, String column) {
+        assertThat(DatabaseFixture.query(String.format("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE COLUMN_NAME='%s' AND TABLE_NAME='%s' AND TABLE_SCHEMA='PUBLIC'", column, table), h2Database),
+                is(new Object[][]{{0L}}));
     }
 
     private void matchUserAttributesForUsername(final String username, final String email, final boolean enabled, final String actualName) {

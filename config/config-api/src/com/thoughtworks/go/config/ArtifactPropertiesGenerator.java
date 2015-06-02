@@ -16,17 +16,17 @@
 
 package com.thoughtworks.go.config;
 
-import java.io.File;
-import java.io.Serializable;
-import javax.xml.xpath.XPathExpressionException;
-
 import com.thoughtworks.go.config.preprocessor.SkipParameterResolution;
 import com.thoughtworks.go.domain.ConfigErrors;
 import com.thoughtworks.go.domain.PersistentObject;
 import com.thoughtworks.go.domain.Property;
+import com.thoughtworks.go.util.ExceptionUtils;
 import com.thoughtworks.go.util.XpathUtils;
 import com.thoughtworks.go.work.GoPublisher;
-import com.thoughtworks.go.util.ExceptionUtils;
+
+import javax.xml.xpath.XPathExpressionException;
+import java.io.File;
+import java.io.Serializable;
 
 import static java.lang.String.format;
 
@@ -52,6 +52,11 @@ public class ArtifactPropertiesGenerator extends PersistentObject implements Ser
         this.name = name;
         this.src = src;
         this.xpath = xpath;
+    }
+
+    public ArtifactPropertiesGenerator(ArtifactPropertiesGenerator other) {
+        this(other.name, other.src, other.xpath);
+        this.configErrors = other.configErrors;
     }
 
     public String getName() {
@@ -117,28 +122,20 @@ public class ArtifactPropertiesGenerator extends PersistentObject implements Ser
         File file = new File(buildWorkingDirectory, getSrc());
         String indent = "             ";
         if (!file.exists()) {
-            publisher.consumeLine(
-                    format("%sFailed to create property %s. File %s does not exist." + "\n",
-                            indent, getName(), file.getAbsolutePath()));
+            publisher.consumeLine(format("%sFailed to create property %s. File %s does not exist.", indent, getName(), file.getAbsolutePath()));
         } else {
             try {
                 if (!XpathUtils.nodeExists(file, getXpath())) {
-                    publisher.consumeLine(format(
-                            "%sFailed to create property %s. Nothing matched xpath \"%s\" in the file: %s." + "\n",
-                            "             ", getName(), getXpath(), file.getAbsolutePath()));
+                    publisher.consumeLine(format("%sFailed to create property %s. Nothing matched xpath \"%s\" in the file: %s.", indent, getName(), getXpath(), file.getAbsolutePath()));
                 } else {
                     String value = XpathUtils.evaluate(file, getXpath());
                     publisher.setProperty(new Property(getName(), value));
 
-                    publisher.consumeLine(
-                            format("%sProperty %s = %s created." + "\n", indent, getName(), value));
+                    publisher.consumeLine(format("%sProperty %s = %s created." + "\n", indent, getName(), value));
                 }
             } catch (Exception e) {
-                String error = (e instanceof XPathExpressionException)
-                        ? (format("Illegal xpath: \"%s\"", getXpath()))
-                        : ExceptionUtils.messageOf(e);
-                String message = format("%sFailed to create property %s. %s" + "\n", indent, getName(),
-                        error);
+                String error = (e instanceof XPathExpressionException) ? (format("Illegal xpath: \"%s\"", getXpath())) : ExceptionUtils.messageOf(e);
+                String message = format("%sFailed to create property %s. %s", indent, getName(), error);
                 publisher.reportErrorMessage(message, e);
             }
         }

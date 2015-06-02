@@ -16,14 +16,9 @@
 
 package com.thoughtworks.go.server.service;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.thoughtworks.go.config.CaseInsensitiveString;
 import com.thoughtworks.go.config.materials.PackageMaterial;
+import com.thoughtworks.go.config.materials.PluggableSCMMaterial;
 import com.thoughtworks.go.config.materials.SubprocessExecutionContext;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
 import com.thoughtworks.go.config.materials.git.GitMaterial;
@@ -31,29 +26,27 @@ import com.thoughtworks.go.config.materials.mercurial.HgMaterial;
 import com.thoughtworks.go.config.materials.perforce.P4Material;
 import com.thoughtworks.go.config.materials.svn.SvnMaterial;
 import com.thoughtworks.go.config.materials.tfs.TfsMaterial;
-import com.thoughtworks.go.domain.materials.MatchedRevision;
-import com.thoughtworks.go.domain.materials.Material;
-import com.thoughtworks.go.domain.materials.MaterialConfig;
-import com.thoughtworks.go.domain.materials.Modification;
-import com.thoughtworks.go.domain.materials.Revision;
+import com.thoughtworks.go.domain.MaterialInstance;
+import com.thoughtworks.go.domain.materials.*;
 import com.thoughtworks.go.i18n.LocalizedMessage;
+import com.thoughtworks.go.plugin.access.packagematerial.PackageAsRepositoryExtension;
+import com.thoughtworks.go.plugin.access.scm.SCMExtension;
 import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.persistence.MaterialRepository;
-import com.thoughtworks.go.server.service.materials.DependencyMaterialPoller;
-import com.thoughtworks.go.server.service.materials.GitPoller;
-import com.thoughtworks.go.server.service.materials.HgPoller;
-import com.thoughtworks.go.server.service.materials.MaterialPoller;
-import com.thoughtworks.go.server.service.materials.NoOpPoller;
-import com.thoughtworks.go.server.service.materials.P4Poller;
-import com.thoughtworks.go.server.service.materials.PackageMaterialPoller;
-import com.thoughtworks.go.server.service.materials.SvnPoller;
-import com.thoughtworks.go.server.service.materials.TfsPoller;
+import com.thoughtworks.go.server.service.materials.*;
 import com.thoughtworks.go.server.service.result.LocalizedOperationResult;
+import com.thoughtworks.go.server.transaction.TransactionTemplate;
+import com.thoughtworks.go.server.util.Pagination;
 import com.thoughtworks.go.serverhealth.HealthStateScope;
 import com.thoughtworks.go.serverhealth.HealthStateType;
-import com.thoughtworks.go.plugin.infra.PluginManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @understands interactions between material-config, repository and modifications
@@ -63,15 +56,20 @@ public class MaterialService {
     private final MaterialRepository materialRepository;
     private final GoConfigService goConfigService;
     private final SecurityService securityService;
-    private PluginManager pluginManager;
+    private PackageAsRepositoryExtension packageAsRepositoryExtension;
+    private SCMExtension scmExtension;
+    private TransactionTemplate transactionTemplate;
     private Map<Class, MaterialPoller> materialPollerMap = new HashMap<Class, MaterialPoller>();
 
     @Autowired
-    public MaterialService(MaterialRepository materialRepository, GoConfigService goConfigService, SecurityService securityService, PluginManager pluginManager) {
+    public MaterialService(MaterialRepository materialRepository, GoConfigService goConfigService, SecurityService securityService,
+                           PackageAsRepositoryExtension packageAsRepositoryExtension, SCMExtension scmExtension, TransactionTemplate transactionTemplate) {
         this.materialRepository = materialRepository;
         this.goConfigService = goConfigService;
         this.securityService = securityService;
-        this.pluginManager = pluginManager;
+        this.packageAsRepositoryExtension = packageAsRepositoryExtension;
+        this.scmExtension = scmExtension;
+        this.transactionTemplate = transactionTemplate;
         populatePollerImplementations();
     }
 
@@ -82,7 +80,8 @@ public class MaterialService {
         materialPollerMap.put(TfsMaterial.class, new TfsPoller());
         materialPollerMap.put(P4Material.class, new P4Poller());
         materialPollerMap.put(DependencyMaterial.class, new DependencyMaterialPoller());
-        materialPollerMap.put(PackageMaterial.class, new PackageMaterialPoller(pluginManager));
+        materialPollerMap.put(PackageMaterial.class, new PackageMaterialPoller(packageAsRepositoryExtension));
+        materialPollerMap.put(PluggableSCMMaterial.class, new PluggableSCMMaterialPoller(materialRepository, scmExtension, transactionTemplate));
     }
 
     public boolean hasModificationFor(Material material) {
@@ -115,6 +114,18 @@ public class MaterialService {
         MaterialPoller materialPoller = materialPollerMap.get(getMaterialClass(material));
         return materialPoller == null ? new NoOpPoller() : materialPoller;
     }
+
+	public Long getTotalModificationsFor(MaterialConfig materialConfig) {
+		MaterialInstance materialInstance = materialRepository.findMaterialInstance(materialConfig);
+
+		return materialRepository.getTotalModificationsFor(materialInstance);
+	}
+
+	public Modifications getModificationsFor(MaterialConfig materialConfig, Pagination pagination) {
+		MaterialInstance materialInstance = materialRepository.findMaterialInstance(materialConfig);
+
+		return materialRepository.getModificationsFor(materialInstance, pagination);
+	}
 
     Class<? extends Material> getMaterialClass(Material material) {
         return material.getClass();

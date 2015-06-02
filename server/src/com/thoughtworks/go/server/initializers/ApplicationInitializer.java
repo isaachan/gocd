@@ -1,5 +1,5 @@
 /*************************GO-LICENSE-START*********************************
- * Copyright 2014 ThoughtWorks, Inc.
+ * Copyright 2015 ThoughtWorks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,9 @@ import com.thoughtworks.go.config.CachedGoConfig;
 import com.thoughtworks.go.config.GoConfigDataSource;
 import com.thoughtworks.go.config.InvalidConfigMessageRemover;
 import com.thoughtworks.go.config.registry.ConfigElementImplementationRegistrar;
+import com.thoughtworks.go.domain.cctray.CcTrayActivityListener;
+import com.thoughtworks.go.plugin.infra.commons.PluginsZip;
+import com.thoughtworks.go.plugin.infra.monitor.DefaultPluginJarLocationMonitor;
 import com.thoughtworks.go.server.cronjob.GoDiskSpaceMonitor;
 import com.thoughtworks.go.server.dao.PipelineSqlMapDao;
 import com.thoughtworks.go.server.domain.PipelineTimeline;
@@ -28,21 +31,12 @@ import com.thoughtworks.go.server.persistence.OauthTokenSweeper;
 import com.thoughtworks.go.server.security.GoCasServiceProperties;
 import com.thoughtworks.go.server.security.LdapContextFactory;
 import com.thoughtworks.go.server.security.RemoveAdminPermissionFilter;
-import com.thoughtworks.go.server.service.AgentService;
-import com.thoughtworks.go.server.service.ArtifactsDirHolder;
-import com.thoughtworks.go.server.service.ArtifactsService;
-import com.thoughtworks.go.server.service.BackupService;
-import com.thoughtworks.go.server.service.BuildAssignmentService;
-import com.thoughtworks.go.server.service.ConsoleActivityMonitor;
-import com.thoughtworks.go.server.service.GoConfigService;
-import com.thoughtworks.go.server.service.GoLicenseService;
-import com.thoughtworks.go.server.service.EnvironmentConfigService;
-import com.thoughtworks.go.server.service.LicenseViolationChecker;
-import com.thoughtworks.go.server.service.PipelineLockService;
-import com.thoughtworks.go.server.service.PipelineScheduler;
-import com.thoughtworks.go.server.service.TimerScheduler;
+import com.thoughtworks.go.server.service.*;
+import com.thoughtworks.go.server.service.support.toggle.FeatureToggleService;
+import com.thoughtworks.go.server.service.support.toggle.Toggles;
+import com.thoughtworks.go.server.util.ServletHelper;
 import com.thoughtworks.go.service.ConfigRepository;
-import com.thoughtworks.go.plugin.infra.monitor.DefaultPluginJarLocationMonitor;
+import com.thoughtworks.go.util.SystemEnvironment;
 import com.thoughtworks.studios.shine.cruise.stage.details.StageResourceImporter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -54,7 +48,7 @@ import org.springframework.stereotype.Component;
 public class ApplicationInitializer implements ApplicationListener<ContextRefreshedEvent> {
     @Autowired private CommandRepositoryInitializer commandRepositoryInitializer;
     @Autowired private PluginsInitializer pluginsInitializer;
-    @Autowired private PluginsZipInitializer pluginsZipInitializer;
+    @Autowired private PluginsZip pluginsZip;
     @Autowired private PipelineSqlMapDao pipelineSqlMapDao;
     @Autowired private PipelineTimeline pipelineTimeline;
     @Autowired private ConfigRepository configRepository;
@@ -64,7 +58,6 @@ public class ApplicationInitializer implements ApplicationListener<ContextRefres
     @Autowired private AgentService agentService;
     @Autowired private GoConfigService goConfigService;
     @Autowired private GoConfigDataSource goConfigDataSource;
-    @Autowired private GoLicenseService goLicenseService;
     @Autowired private EnvironmentConfigService environmentConfigService;
     @Autowired private DefaultPluginJarLocationMonitor defaultPluginJarLocationMonitor;
     @Autowired private CachedGoConfig cachedGoConfig;
@@ -82,7 +75,11 @@ public class ApplicationInitializer implements ApplicationListener<ContextRefres
     @Autowired private GoDiskSpaceMonitor goDiskSpaceMonitor;
     @Autowired private BackupService backupService;
     @Autowired private ArtifactsService artifactsService;
+    @Autowired private ConsoleService consoleService;
     @Autowired private ConfigElementImplementationRegistrar configElementImplementationRegistrar;
+    @Autowired private RailsAssetsService railsAssetsService;
+    @Autowired private FeatureToggleService featureToggleService;
+    @Autowired private CcTrayActivityListener ccTrayActivityListener;
 
     @Override
     public void onApplicationEvent(ContextRefreshedEvent contextRefreshedEvent) {
@@ -93,7 +90,7 @@ public class ApplicationInitializer implements ApplicationListener<ContextRefres
             //plugin
             defaultPluginJarLocationMonitor.initialize();
             pluginsInitializer.initialize();
-            pluginsZipInitializer.initialize();
+            pluginsZip.create();
 
             //config
             configElementImplementationRegistrar.initialize();
@@ -106,6 +103,9 @@ public class ApplicationInitializer implements ApplicationListener<ContextRefres
             //artifacts
             artifactsDirHolder.initialize();
             artifactsService.initialize();
+
+            //console logs
+            consoleService.initialize();
 
             //change listener
             environmentConfigService.initialize();
@@ -128,6 +128,11 @@ public class ApplicationInitializer implements ApplicationListener<ContextRefres
             goCasServiceProperties.initialize();
             goDiskSpaceMonitor.initialize();
             backupService.initialize();
+            railsAssetsService.initialize();
+            ccTrayActivityListener.initialize();
+            ServletHelper.init(new SystemEnvironment().usingJetty9());
+            // initialize static accessors
+            Toggles.initializeWith(featureToggleService);
         } catch (Throwable throwable) {
             throw new RuntimeException(throwable);
         }

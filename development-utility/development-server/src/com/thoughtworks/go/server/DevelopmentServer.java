@@ -17,6 +17,7 @@
 package com.thoughtworks.go.server;
 
 import com.thoughtworks.go.util.GoConstants;
+import com.thoughtworks.go.util.OperatingSystem;
 import com.thoughtworks.go.util.SystemEnvironment;
 import com.thoughtworks.go.util.ZipUtil;
 import com.thoughtworks.go.util.command.ProcessRunner;
@@ -36,36 +37,45 @@ import java.io.IOException;
 public class DevelopmentServer {
     public static void main(String[] args) throws Exception {
         copyDbFiles();
-        copyScss();
-        File webapp = new File("webapp");
-        if (!webapp.exists()) {
-            throw new RuntimeException("No webapp found in " + webapp.getAbsolutePath());
+        File webApp = new File("webapp");
+        if (!webApp.exists()) {
+            throw new RuntimeException("No webapp found in " + webApp.getAbsolutePath());
         }
 
         copyActivatorJarToClassPath();
         SystemEnvironment systemEnvironment = new SystemEnvironment();
+
+        String chosenAppServer = System.getProperty(SystemEnvironment.APP_SERVER.propertyName());
+        if (chosenAppServer == null || chosenAppServer.trim().isEmpty()) {
+            systemEnvironment.set(SystemEnvironment.APP_SERVER, SystemEnvironment.JETTY9);
+        }
+
         systemEnvironment.setProperty(SystemEnvironment.PARENT_LOADER_PRIORITY, "true");
-        systemEnvironment.setProperty(SystemEnvironment.CRUISE_SERVER_WAR_PROPERTY, webapp.getAbsolutePath());
+        systemEnvironment.setProperty(SystemEnvironment.CRUISE_SERVER_WAR_PROPERTY, webApp.getAbsolutePath());
+
         systemEnvironment.set(SystemEnvironment.DEFAULT_PLUGINS_ZIP, "/plugins.zip");
         systemEnvironment.setProperty(GoConstants.I18N_CACHE_LIFE, "0"); //0 means reload when stale
         File pluginsDist = new File("../tw-go-plugins/dist/");
-        if (pluginsDist.exists()) {
-            new ZipUtil().zipFolderContents(pluginsDist, new File(classpath(), "plugins.zip"));
+        if (!pluginsDist.exists()) {
+            pluginsDist.mkdirs();
         }
+        new ZipUtil().zipFolderContents(pluginsDist, new File(classpath(), "plugins.zip"));
         GoServer server = new GoServer();
         systemEnvironment.setProperty(GoConstants.USE_COMPRESSED_JAVASCRIPT, Boolean.toString(false));
         try {
             server.startServer();
+
+            String hostName = systemEnvironment.getListenHost();
+            if(hostName == null){
+                hostName = "localhost";
+            }
+
+            System.out.println("Go server dashboard started on http://" + hostName + ":" + systemEnvironment.getServerPort());
+            System.out.println("* credentials: \"admin\" / \"badger\"");
         } catch (Exception e) {
             System.err.println("Failed to start Go server. Exception:");
             e.printStackTrace();
         }
-    }
-
-
-    private static void copyScss() throws IOException, InterruptedException {
-        FileUtils.deleteDirectory(new File("webapp/stylesheets/css_sass"));
-        new ProcessRunner().command("sass", "--update", ".:../stylesheets/css_sass/").withWorkingDir("webapp/sass/").run();
     }
 
     private static void copyDbFiles() throws IOException {

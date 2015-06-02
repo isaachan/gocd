@@ -113,7 +113,7 @@
                 <th class="pipeline-name" scope="row" style="${%pipelineHistoryPage.fixIEZIndexBugs()%}">
                     <div class="wrapper" style="${%pipelineHistoryPage.fixIEZIndexBugs()%}">
                         <span id="pipeline-${% pipeline.pipelineId %}-label" class="pipeline-label"> <a href="$req.getContextPath()/pipelines/value_stream_map/${% data.pipelineName %}/${% pipeline.counterOrLabel %}" title="${% pipeline.label %}">${% pipeline.label.truncate(17) %}</a></span><br/>
-                        <span class="pipeline-info" id="pipeline-${% pipeline.pipelineId %}-revision" title="${% pipeline.revision %}">revision: ${% pipeline.revision %}</span><br/>
+                        <span class="pipeline-info revision" id="pipeline-${% pipeline.pipelineId %}-revision" title="${% pipeline.revision %}">revision: ${% pipeline.revision %}</span><br/>
                         <span id="pipeline-${% pipeline.pipelineId %}-modificationDate" class="pipeline-info">${% pipeline.modification_date %}</span><br/>
                         <span id="pipeline-${% pipeline.pipelineId %}-buildCause"
                               class="pipeline-info popup-${% pipelineHistoryPage.buildCauseActor.getBuildCauseClass(pipeline.pipelineId) %}" style="${%pipelineHistoryPage.fixIEZIndexBugs()%}">
@@ -158,7 +158,7 @@
                                 <div id="stage-detail-${% pipeline.counterOrLabel %}-${% stage.stageName %}" class="${% pipelineHistoryPage.getState(stage.stageStatus) %}-stage">
                             {/if}
                              {if stage.stageStatus == 'Cancelled'}
-                                 <img alt="" src="$req.getContextPath()/images/g9/stage_bar_cancelled_icon.png">
+                                <img alt="" src="$req.getContextPath()/$concatenatedStageBarCancelledIconFilePath">
                              {/if}
                                 {if stage.getCanRun == 'true'}
                                 <a id="rerun-${% data.pipelineName %}-${% pipeline.counterOrLabel %}-${% stage.stageName %}" class="rerun" title="rerun this stage"
@@ -176,9 +176,33 @@
                             <a class="empty-stage" href="javascript:void(0);"></a>
                         {/if}
                     </div>
-                </td>
-                {/for}
-                <td class="spacer">&nbsp;</td>
+                    </td>
+                    {/for}
+                    {if $pipeline_comment_feature_toggle_key }
+                    <td>
+                        <p class="pipeline-info pipeline-history-build-comment">${%pipeline.comment|h%}</p>
+
+                        {if pipeline.comment == ""}
+                        <input class="pipeline-comment-button" type="button" value="Add Comment"
+                               onClick="PipelineHistoryComment.showModal('${% data.pipelineName %}', '${% pipeline.label %}', '${% pipeline.counterOrLabel %}');">
+                        {else}
+                        <input class="pipeline-comment-button" type="button" value="Edit Comment"
+                               onClick="PipelineHistoryComment.showModal('${% data.pipelineName %}', '${% pipeline.label %}', '${% pipeline.counterOrLabel %}');">
+                        {/if}
+
+                        <div class="comment-form" id="comment-form-${% pipeline.counterOrLabel %}" style="display: none;">
+                            <div id="comment-box-wrapper">
+                                <input type="text" id="comment-input" value="${%pipeline.comment|h|escapeQuotes%}">
+                                <button type="button" id="comment-button" class="image submit primary"
+                                   onClick="PipelineHistoryComment.submit('${% data.pipelineName %}', '${% pipeline.counterOrLabel %}');">
+                                    Submit
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                    {/if}
+                    <td class="spacer">&nbsp;</td>
+                </div>
             </tr>
             {/for}
         </tbody>

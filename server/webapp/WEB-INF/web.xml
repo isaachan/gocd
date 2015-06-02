@@ -61,11 +61,6 @@
     </context-param>
 
     <context-param>
-      <param-name>rails.root</param-name>
-      <param-value>/WEB-INF/rails</param-value>
-    </context-param>
-
-    <context-param>
       <param-name>public.root</param-name>
       <param-value>/</param-value>
     </context-param>
@@ -142,6 +137,18 @@
     </servlet>
 
     <servlet>
+        <servlet-name>spring-add-on</servlet-name>
+        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <servlet>
+        <servlet-name>spring-plugin</servlet-name>
+        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <servlet>
         <servlet-name>spring-tabs</servlet-name>
         <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
         <load-on-startup>1</load-on-startup>
@@ -200,18 +207,8 @@
     </servlet-mapping>
 
     <servlet-mapping>
-        <servlet-name>spring-pages</servlet-name>
-        <url-pattern>/about</url-pattern>
-    </servlet-mapping>
-
-    <servlet-mapping>
         <servlet-name>spring-rest</servlet-name>
         <url-pattern>*.json</url-pattern>
-    </servlet-mapping>
-
-    <servlet-mapping>
-        <servlet-name>spring-rest</servlet-name>
-        <url-pattern>/cctray.xml</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
@@ -246,6 +243,21 @@
     </servlet-mapping>
 <!-- END new UI -->
 
+    <servlet-mapping>
+        <servlet-name>spring-add-on</servlet-name>
+        <url-pattern>/add-on/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>spring-plugin</servlet-name>
+        <url-pattern>/plugin/interact/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>default</servlet-name>
+        <url-pattern>/</url-pattern>
+    </servlet-mapping>
+
 
     <welcome-file-list>
         <welcome-file>index.html</welcome-file>
@@ -253,7 +265,7 @@
 
     <mime-mapping>
         <extension>log</extension>
-        <mime-type>text/plain</mime-type>
+        <mime-type>text/plain;charset=utf-8</mime-type>
     </mime-mapping>
 
     <mime-mapping>
@@ -265,4 +277,9 @@
         <extension>svg</extension>
         <mime-type>image/svg+xml</mime-type>
     </mime-mapping>
+
+    <!-- Do not timeout idle/stale sessions for 14 days: 60 * 24 * 14 minutes. -->
+    <session-config>
+        <session-timeout>20160</session-timeout>
+    </session-config>
 </web-app>

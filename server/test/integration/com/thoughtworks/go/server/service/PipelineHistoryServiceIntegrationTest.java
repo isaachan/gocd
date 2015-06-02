@@ -47,6 +47,7 @@ import com.thoughtworks.go.fixture.PipelineWithTwoStages;
 import com.thoughtworks.go.helper.ModificationsMother;
 import com.thoughtworks.go.helper.PipelineConfigMother;
 import com.thoughtworks.go.helper.StageConfigMother;
+import com.thoughtworks.go.i18n.Localizer;
 import com.thoughtworks.go.presentation.pipelinehistory.EmptyPipelineInstanceModel;
 import com.thoughtworks.go.presentation.pipelinehistory.NullStageHistoryItem;
 import com.thoughtworks.go.presentation.pipelinehistory.PipelineGroupModel;
@@ -65,6 +66,8 @@ import com.thoughtworks.go.server.persistence.PipelineRepository;
 import com.thoughtworks.go.server.scheduling.TriggerMonitor;
 import com.thoughtworks.go.server.service.result.HttpLocalizedOperationResult;
 import com.thoughtworks.go.server.service.result.HttpOperationResult;
+import com.thoughtworks.go.server.service.support.toggle.FeatureToggleService;
+import com.thoughtworks.go.server.service.support.toggle.Toggles;
 import com.thoughtworks.go.server.transaction.TransactionTemplate;
 import com.thoughtworks.go.server.util.Pagination;
 import com.thoughtworks.go.util.GoConfigFileHelper;
@@ -106,11 +109,15 @@ public class PipelineHistoryServiceIntegrationTest {
     @Autowired private GoCache goCache;
     @Autowired private TransactionTemplate transactionTemplate;
     @Autowired private PipelinePauseService pipelinePauseService;
+    @Autowired private Localizer localizer;
+    @Autowired private FeatureToggleService featureToggleService;
 
     private GoConfigFileHelper configHelper = new GoConfigFileHelper();
     private PipelineWithMultipleStages pipelineOne;
     private PipelineWithTwoStages pipelineTwo;
     private ArtifactsDiskIsFull diskIsFull;
+
+    private boolean pipelineCommentFeatureToggleState;
 
     @Before
     public void setUp() throws Exception {
@@ -134,6 +141,9 @@ public class PipelineHistoryServiceIntegrationTest {
 
         configHelper.addSecurityWithAdminConfig();
         configHelper.setOperatePermissionForGroup("group1", "jez");
+
+        pipelineCommentFeatureToggleState = featureToggleService.isToggleOn(Toggles.PIPELINE_COMMENT_FEATURE_TOGGLE_KEY);
+        featureToggleService.changeValueOfToggle(Toggles.PIPELINE_COMMENT_FEATURE_TOGGLE_KEY, true);
     }
 
     @After
@@ -142,6 +152,8 @@ public class PipelineHistoryServiceIntegrationTest {
         dbHelper.onTearDown();
         pipelineOne.onTearDown();
         configHelper.onTearDown();
+
+        featureToggleService.changeValueOfToggle(Toggles.PIPELINE_COMMENT_FEATURE_TOGGLE_KEY, pipelineCommentFeatureToggleState);
     }
 
     @Test
@@ -587,6 +599,26 @@ public class PipelineHistoryServiceIntegrationTest {
         assertThat(pipelineInstance, is(not(nullValue())));
     }
 
+	@Test
+	public void shouldLoadPipelineHistoryWithPlaceholderStagesPopulated_loadMinimalData() throws Exception {
+		pipelineOne.createPipelineWithFirstStagePassedAndSecondStageHasNotStarted();
+
+		HttpOperationResult result = new HttpOperationResult();
+		PipelineInstanceModels pipelineInstanceModels = pipelineHistoryService.loadMinimalData(pipelineOne.pipelineName, Pagination.pageStartingAt(0, 1, 10), "admin1", result);
+
+		StageInstanceModels stageHistory = pipelineInstanceModels.first().getStageHistory();
+		assertThat("Should populate 2 placeholder stages from config", stageHistory.size(), is(3));
+		assertThat(stageHistory.first().isScheduled(), is(true));
+		assertThat(stageHistory.first().isAutoApproved(), is(true));
+		assertThat(stageHistory.first().getCanRun(), is(true));
+		assertThat(stageHistory.get(1).isScheduled(), is(false));
+		assertThat(stageHistory.get(1).isAutoApproved(), is(false));
+		assertThat("The first future stage should can run", stageHistory.get(1).getCanRun(), is(true));
+		assertThat(stageHistory.get(2).isScheduled(), is(false));
+		assertThat(stageHistory.get(2).isAutoApproved(), is(true));
+		assertThat("The second future stage should can not run", stageHistory.get(2).getCanRun(), is(false));
+	}
+
     @Test
     public void shouldLoadLatestOrEmptyInstanceForAllConfiguredPipelines() {
         configHelper.removePipeline(pipelineTwo.pipelineName);
@@ -949,6 +981,41 @@ public class PipelineHistoryServiceIntegrationTest {
         assertThat(pipelineInstances.size(), is(0));
         assertThat(result.isSuccessful(), is(false));
         assertThat(result.httpCode(), is(401));
+    }
+
+    @Test
+    public void updateComment_shouldUpdateTheCommentInTheDatabase() throws Exception {
+        PipelineConfig pipelineConfig = PipelineConfigMother.createPipelineConfig("pipeline_name", "stage", "job");
+        goConfigService.addPipeline(pipelineConfig, "pipeline-group");
+        configHelper.addAuthorizedUserForPipelineGroup("valid-user");
+        configHelper.setAdminPermissionForGroup("pipeline-group", "valid-user");
+
+        dbHelper.newPipelineWithAllStagesPassed(pipelineConfig);
+        HttpLocalizedOperationResult result = new HttpLocalizedOperationResult();
+        pipelineHistoryService.updateComment("pipeline_name", 1, "test comment", new Username(new CaseInsensitiveString("valid-user")), result);
+
+        PipelineInstanceModel pim = dbHelper.getPipelineDao().findPipelineHistoryByNameAndCounter("pipeline_name", 1);
+        assertThat(pim.getComment(), is("test comment"));
+    }
+
+    @Test
+    public void updateComment_shouldNotUpdateTheCommentInTheDatabaseIfTheUserIsUnauthorized() throws Exception {
+        PipelineConfig pipelineConfig = PipelineConfigMother.createPipelineConfig("pipeline_name", "stage", "job");
+        goConfigService.addPipeline(pipelineConfig, "pipeline-group");
+        configHelper.addAuthorizedUserForPipelineGroup("valid-user");
+
+        dbHelper.newPipelineWithAllStagesPassed(pipelineConfig);
+
+        HttpLocalizedOperationResult result = new HttpLocalizedOperationResult();
+
+        pipelineHistoryService.updateComment("pipeline_name", 1, "test comment",
+                new Username(new CaseInsensitiveString("invalid-user")), result);
+
+        PipelineInstanceModel pim = dbHelper.getPipelineDao().findPipelineHistoryByNameAndCounter("pipeline_name", 1);
+
+        assertThat(pim.getComment(), is(nullValue()));
+        assertThat(result.httpCode(), is(401));
+        assertThat(result.message(localizer), is("You do not have operate permissions for pipeline 'pipeline_name'."));
     }
 
     private void assertPipeline(PipelineInstanceModel pipelineInstance, Pipeline instance, HttpOperationResult operationResult) {

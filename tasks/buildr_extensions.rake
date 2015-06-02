@@ -52,8 +52,7 @@ def agent_bootstrapper_layout(_module)
 end
 
 def server_layout(_module)
-  layout = Layout.new
-  layout[:target] = "../target/#{_module}"
+  layout = Layout::Default.new
   layout[:root] = ".."
   layout[:reports, :specs] = "../target/specs/#{_module}"
   layout[:reports, :twist] = "../target/reports/twist/#{_module}"
@@ -89,6 +88,7 @@ def package_submodule_layout(_parent, _module, _package_basename)
   new_layout[:windows_package] = "#{new_layout[:target]}/windows_package/#{_package_basename}-#{VERSION_NUMBER}-#{RELEASE_REVISION}-setup.exe"
   new_layout[:solaris_package] = "#{new_layout[:target]}/sol/#{_package_basename}-#{VERSION_NUMBER}.#{RELEASE_REVISION}-solaris.gz"
   new_layout[:zip_package] = "#{new_layout[:target]}/#{_package_basename}-#{VERSION_NUMBER}-#{RELEASE_REVISION}.zip"
+  new_layout[:osx_package] = "#{new_layout[:target]}/osx_package/#{_package_basename}-#{VERSION_NUMBER}-#{RELEASE_REVISION}-osx.zip"
   new_layout
 end
 
@@ -273,10 +273,16 @@ module SolarisPackageHelper
       end
 
       ["#{package}.sh", "go-#{package}"].each do |file_name|
-        sh "/usr/bin/chmod a+x #{sol_pkg_file(name_with_version, file_name)}"
+        sol_pkg_file = sol_pkg_file(name_with_version, file_name)
+        puts "CHMOD 0755 for file #{sol_pkg_file}"
+        FileUtils.chmod 0755, sol_pkg_file
       end
 
-      sh "cd #{sol_pkg_dir(name_with_version)} && /usr/bin/pkgproto .=go-#{package} >> #{sol_prototype_file(name_with_version)}"
+      cd(sol_pkg_dir(name_with_version)) do
+        command = "/usr/bin/pkgproto .=go-#{package} >> #{sol_prototype_file(name_with_version)}"
+        puts "Executing command #{command} from #{`pwd`}"
+        sh command
+      end
 
       user_name = `/usr/xpg4/bin/id -u -n`.strip
       user_group = `/usr/xpg4/bin/id -g -n`.strip
@@ -402,6 +408,48 @@ module WinPackageHelper
     end
   end
 end
+
+module OSXPackageHelper
+  def osx_dir
+    _(:target, "osx_package")
+  end
+
+  def build_osx_installer(pkg, pkg_dir)
+    go_pkg_name_with_release_revision = "#{"go-#{pkg}-#{VERSION_NUMBER}"}-#{RELEASE_REVISION}"
+
+    cd(osx_dir) do
+      contents_dir = create_dir_if_not_present(pkg_dir, "Contents")
+      cp File.join("..", "..", "..", "..", "installers", pkg, "osx", "Info.plist"), contents_dir
+      replace_content_in_file(File.join(contents_dir, "Info.plist"), "@VERSION@", "#{VERSION_NUMBER}.#{RELEASE_REVISION}")
+      replace_content_in_file(File.join(contents_dir, "Info.plist"), "@REGVER@", "#{RELEASE_REVISION}")
+
+      resources_dir = create_dir_if_not_present(contents_dir, "Resources")
+      cp File.join("..", "..", "..", "..", "build", "icons", "go-#{pkg}.icns"), resources_dir
+
+      mac_os_dir = create_dir_if_not_present(contents_dir, "MacOS")
+      java_application_stub_64_file = File.join(mac_os_dir, "go-#{pkg}")
+      cp File.join("..", "..", "..", "..", "build", "osx", "JavaApplicationStub64"), java_application_stub_64_file
+      chmod 0755, java_application_stub_64_file
+
+      system("zip -q -r -9 #{go_pkg_name_with_release_revision}-osx.zip \"#{pkg_dir}\"") || \
+        (STDERR.puts "Failed to zip the OSX installer from #{pkg_dir}"; exit 1)
+      rm_rf pkg_dir
+    end
+  end
+
+  def replace_content_in_file file_name, pattern, replacement
+    text = File.read(file_name)
+    text.gsub!(pattern, replacement)
+    File.open(file_name, 'w') {|file| file.puts text}
+  end
+
+  def create_dir_if_not_present path, dir
+    dir_to_create = File.join(path, dir)
+    mkdir_p dir_to_create unless File.directory? dir_to_create
+    dir_to_create
+  end
+end
+
 
 def in_root filename
   File.join($PROJECT_BASE, filename)
