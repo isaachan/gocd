@@ -25,6 +25,7 @@ module Admin
        l.string("P4") => P4MaterialConfig::TYPE,
        l.string("TFS") => com.thoughtworks.go.config.materials.tfs.TfsMaterialConfig::TYPE,
        l.string("PIPELINE") => DependencyMaterialConfig::TYPE,
+       l.string("EXTERNALPIPELINE") => ExternalDependencyMaterialConfig::TYPE,
        l.string("PACKAGE") => PackageMaterialConfig::TYPE
       }
     end

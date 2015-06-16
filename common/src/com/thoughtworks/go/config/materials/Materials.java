@@ -23,6 +23,8 @@ import java.util.List;
 import com.thoughtworks.go.config.CaseInsensitiveString;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterialConfig;
+import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterial;
+import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterialConfig;
 import com.thoughtworks.go.config.materials.git.GitMaterial;
 import com.thoughtworks.go.config.materials.git.GitMaterialConfig;
 import com.thoughtworks.go.config.materials.mercurial.HgMaterial;
@@ -239,6 +241,10 @@ public class Materials extends BaseCollection<Material> {
         return getExistingOrDefaultMaterial(new DependencyMaterial(new CaseInsensitiveString(""), new CaseInsensitiveString("")));
     }
 
+    public ExternalDependencyMaterial getExternalDependencyMaterial() {
+        return getExistingOrDefaultMaterial(new ExternalDependencyMaterial(new CaseInsensitiveString(""), new CaseInsensitiveString(""), new CaseInsensitiveString("")));
+    }
+
     private <T extends Material> T getExistingOrDefaultMaterial(T defaultMaterial) {
         for (Material material : this) {
             if (material.getClass().isAssignableFrom(defaultMaterial.getClass())) {
@@ -263,6 +269,8 @@ public class Materials extends BaseCollection<Material> {
             return new P4Material((P4MaterialConfig) materialConfig);
         } else if (DependencyMaterial.TYPE.equals(materialConfig.getType())) {
             return new DependencyMaterial((DependencyMaterialConfig) materialConfig);
+        }else if (ExternalDependencyMaterial.TYPE.equals(materialConfig.getType())) {
+            return new ExternalDependencyMaterial((ExternalDependencyMaterialConfig) materialConfig);
         } else if (TfsMaterial.TYPE.equals(materialConfig.getType())) {
             return new TfsMaterial((TfsMaterialConfig) materialConfig);
         } else if (PackageMaterial.TYPE.equals(materialConfig.getType())) {

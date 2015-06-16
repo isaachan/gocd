@@ -14,27 +14,27 @@
  * limitations under the License.
  *************************GO-LICENSE-END***********************************/
 
-package com.thoughtworks.go.domain.materials.git;
+package com.thoughtworks.go.domain.materials.dependency;
 
-import com.thoughtworks.go.config.materials.git.GitMaterial;
+import com.thoughtworks.go.config.CaseInsensitiveString;
+import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
+import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterial;
 import com.thoughtworks.go.domain.MaterialInstance;
 import com.thoughtworks.go.domain.materials.Material;
 
-public class GitMaterialInstance extends MaterialInstance {
-    protected GitMaterialInstance() {
+public class ExternalDependencyMaterialInstance extends MaterialInstance {
+
+    protected ExternalDependencyMaterialInstance() {
     }
 
-    public GitMaterialInstance(String url, String branch, String submoduleFolder, String flyweightName) {
-        super(url, null, null, null, null, null, branch, submoduleFolder, flyweightName, null, null, null, null, null);
+    public ExternalDependencyMaterialInstance(String pipelineName, String stageName, String flyweightName, String serverAlias) {
+        super(null, null, pipelineName, stageName, null, null, null, null, flyweightName, null, null, null, null, serverAlias);
     }
 
     @Override public Material toOldMaterial(String name, String folder, String password) {
-        GitMaterial git = new GitMaterial(url, branch, folder);
-        setName(name, git);
-        git.setSubmoduleFolder(submoduleFolder);
-        git.setId(id);
-        return git;
+        ExternalDependencyMaterial dep = new ExternalDependencyMaterial(new CaseInsensitiveString(serverAlias), new CaseInsensitiveString(pipelineName), new CaseInsensitiveString(stageName));
+        setName(name, dep);
+        dep.setId(id);
+        return dep;
     }
-
-
 }

@@ -7,6 +7,7 @@
            git_material = material_configs.getGitMaterial()
            p4_material = material_configs.getP4Material()
            dependency_material = material_configs.getDependencyMaterial()
+           externaldependency_material = material_configs.getExternalDependencyMaterial()
            package_material = material_configs.getPackageMaterial()
         -%>
         <div id="material_forms" class=fieldset>
@@ -53,6 +54,11 @@
                 <div class="hidden material_entry DependencyMaterial">
                     <%= materials_form.fields_for com.thoughtworks.go.config.materials.dependency.DependencyMaterialConfig::TYPE, dependency_material do |dependency_form| %>
                         <%= render :partial => "admin/pipelines/materials/dependency_form.html", :locals => {:scope => {:form => dependency_form, :material => dependency_material}} -%>
+                    <% end %>
+                </div>
+                <div class="hidden material_entry ExternalDependencyMaterial">
+                    <%= materials_form.fields_for com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterialConfig::TYPE, externaldependency_material do |dependency_form| %>
+                        <%= render :partial => "admin/pipelines/materials/externaldependency_form.html", :locals => {:scope => {:form => externaldependency_form, :material => externaldependency_material}} -%>
                     <% end %>
                 </div>
 

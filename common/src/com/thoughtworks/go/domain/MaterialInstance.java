@@ -32,6 +32,7 @@ import static com.thoughtworks.go.util.ExceptionUtils.bombIfNull;
  * @understands persistent material
  */
 public abstract class MaterialInstance extends PersistentObject {
+    protected String serverAlias;
     protected String url;
     protected String username;
     protected String pipelineName;
@@ -54,13 +55,14 @@ public abstract class MaterialInstance extends PersistentObject {
     }
 
     public MaterialInstance(String url, String username, String pipelineName, String stageName, String view, Boolean useTickets, String branch, String submoduleFolder, String flyweightName,
-                            final Boolean checkExternals, String projectPath, String domain, String configuration) {
+                            final Boolean checkExternals, String projectPath, String domain, String configuration, String serverAlias) {
         bombIfNull(flyweightName, "Flyweight name cannot be null.");
 
         this.url = url;
         this.username = username;
         this.submoduleFolder = submoduleFolder;
         this.checkExternals = checkExternals;
+        this.serverAlias = serverAlias;
         this.pipelineName = pipelineName;
         this.stageName = stageName;
         this.view = view;
@@ -104,6 +106,9 @@ public abstract class MaterialInstance extends PersistentObject {
             return false;
         }
         if (domain != null ? !domain.equals(that.domain) : that.domain != null) {
+            return false;
+        }
+        if (serverAlias != null ? !serverAlias.equals(that.serverAlias) : that.serverAlias != null) {
             return false;
         }
         if (pipelineName != null ? !pipelineName.equals(that.pipelineName) : that.pipelineName != null) {

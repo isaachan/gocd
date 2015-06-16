@@ -23,6 +23,7 @@
     <pipeline name="up42">
       <materials>
         <hg url="../manual-testing/ant_hg/dummy" dest="dest_dir" materialName="dummyhg" />
+        <git url="https://github.com/sonncui/testgocd.git" dest="testgocd" materialName="test" />
       </materials>
       <stage name="up42_stage">
         <jobs>
@@ -35,5 +36,8 @@
       </stage>
     </pipeline>
   </pipelines>
+  <agents>
+    <agent hostname="cuicui-ubuntu" ipaddress="10.18.2.121" uuid="ec31e3ab-00cc-4f91-a476-245393dd6591" />
+  </agents>
 </cruise>
 

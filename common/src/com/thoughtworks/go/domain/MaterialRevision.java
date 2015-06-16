@@ -28,6 +28,7 @@ import java.util.TreeSet;
 import com.thoughtworks.go.config.materials.PackageMaterial;
 import com.thoughtworks.go.config.materials.SubprocessExecutionContext;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
+import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterial;
 import com.thoughtworks.go.domain.materials.Material;
 import com.thoughtworks.go.domain.materials.Modification;
 import com.thoughtworks.go.domain.materials.Modifications;
@@ -193,7 +194,7 @@ public class MaterialRevision implements Serializable {
 
     public String buildCausedBy() {
         //TODO: #2363 May move this logic to material object later
-        if (material instanceof DependencyMaterial) {
+        if (material instanceof DependencyMaterial || material instanceof ExternalDependencyMaterial) {
             return getRevision().getRevision();
         } else {
             return modifications.getUsername();
@@ -203,7 +204,7 @@ public class MaterialRevision implements Serializable {
     public String buildCauseMessage() {
         StringBuilder builder = new StringBuilder();
         //TODO: #2363 May move this logic to material object later
-        if (material instanceof DependencyMaterial) {
+        if (material instanceof DependencyMaterial || material instanceof ExternalDependencyMaterial) {
             return builder.append("triggered by ").append(getRevision().getRevision()).toString();
         } else {
             return builder.append("modified by ").append(buildCausedBy()).toString();

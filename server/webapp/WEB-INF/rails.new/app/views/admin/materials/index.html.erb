@@ -87,6 +87,9 @@
                     <li class="menu_item_last_with_border">
                         <%= link_to l.string("PIPELINE"), '#', :onclick => "Modalbox.show('#{admin_dependency_new_path}', {overlayClose: false, title: '#{l.string("ADD_MATERIAL")} - #{l.string("PIPELINE")}'})" -%>
                     </li>
+                    <li class="menu_item_last_with_border">
+                        <%= link_to l.string("EXTERNALPIPELINE"), '#', :onclick => "Modalbox.show('#{admin_externaldependency_new_path}', {overlayClose: false, title: '#{l.string("ADD_MATERIAL")} - #{l.string("EXTERNALPIPELINE")}'})" -%>
+                    </li>
                     <li>
                         <%= link_to l.string("PACKAGE"), '#', :onclick => "Modalbox.show('#{admin_package_new_path}', {overlayClose: false, title: '#{l.string("ADD_MATERIAL")} - #{l.string("PACKAGE")}'})" -%>
                     </li>

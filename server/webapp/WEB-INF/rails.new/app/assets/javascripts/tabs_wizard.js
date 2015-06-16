@@ -73,6 +73,7 @@ TabsWizard = function() {
                             jQuery("input[name='pipeline_group[pipeline][materials][P4Material][serverAndPort]']").valid() &&
                                     jQuery("textarea[name='pipeline_group[pipeline][materials][P4Material][view]']").valid());
                     case "DependencyMaterial": return jQuery("input[name='pipeline_group[pipeline][materials][DependencyMaterial][pipelineStageName]']").valid();
+                    case "ExternalDependencyMaterial": return jQuery("input[name='pipeline_group[pipeline][materials][ExternalDependencyMaterial][serverPipelineStageName]']").valid();
                     case "PackageMaterial": return _isPackageRepositoryFormValid();
                 }
             },

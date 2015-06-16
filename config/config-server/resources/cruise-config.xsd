@@ -322,6 +322,7 @@
     <xsd:complexType name="materialsType">
         <xsd:choice minOccurs="1" maxOccurs="unbounded">
             <xsd:element name="pipeline" type="pipelineType"/>
+            <xsd:element name="externalpipeline" type="externalpipelineType"/>
             <xsd:element name="svn" type="svnType"/>
             <xsd:element name="hg" type="hgType"/>
             <xsd:element name="p4" type="p4Type"/>
@@ -331,11 +332,20 @@
             <xsd:element name="scm" type="scmReferenceType"/>
         </xsd:choice>
     </xsd:complexType>
+
     <xsd:complexType name="pipelineType">
         <xsd:attribute name="pipelineName" type="xsd:string" use="required"/>
         <xsd:attribute name="stageName" type="xsd:string" use="required"/>
         <xsd:attribute name="materialName" type="nameType" use="optional"/>
     </xsd:complexType>
+
+    <xsd:complexType name="externalpipelineType">
+        <xsd:attribute name="serverAlias" type="xsd:string" use="required"/>
+        <xsd:attribute name="pipelineName" type="xsd:string" use="required"/>
+        <xsd:attribute name="stageName" type="xsd:string" use="required"/>
+        <xsd:attribute name="materialName" type="nameType" use="optional"/>
+    </xsd:complexType>
+
     <xsd:complexType name="svnType">
         <xsd:sequence>
             <xsd:element name="filter" type="filterType" minOccurs="0" maxOccurs="1"/>

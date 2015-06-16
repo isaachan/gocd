@@ -53,6 +53,8 @@ module JavaImports
   java_import com.thoughtworks.go.domain.materials.dependency.DependencyMaterialRevision unless defined? DependencyMaterialRevision
   java_import com.thoughtworks.go.config.materials.dependency.DependencyMaterial unless defined? DependencyMaterial
   java_import com.thoughtworks.go.config.materials.dependency.DependencyMaterialConfig unless defined? DependencyMaterialConfig
+  java_import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterial unless defined? ExternalDependencyMaterial
+  java_import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterialConfig unless defined? ExternalDependencyMaterialConfig
   java_import com.thoughtworks.go.domain.materials.MatchedRevision unless defined? MatchedRevision
   java_import com.thoughtworks.go.domain.materials.Material unless defined? Material
   java_import com.thoughtworks.go.config.materials.Materials unless defined? Materials

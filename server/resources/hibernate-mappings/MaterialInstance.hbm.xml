@@ -58,6 +58,12 @@
             <property name="stageName"/>
         </subclass>
 
+        <subclass name="com.thoughtworks.go.domain.materials.dependency.ExternalDependencyMaterialInstance" discriminator-value="ExternalDependencyMaterial">
+            <property name="serverAlias"/>
+            <property name="pipelineName"/>
+            <property name="stageName"/>
+        </subclass>
+
         <subclass name="com.thoughtworks.go.domain.materials.tfs.TfsMaterialInstance" discriminator-value="TfsMaterial">
             <property name="url"/>
             <property name="username"/>

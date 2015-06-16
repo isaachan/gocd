@@ -25,6 +25,7 @@ import com.thoughtworks.go.config.ParamsAttributeAware;
 import com.thoughtworks.go.config.Validatable;
 import com.thoughtworks.go.config.ValidationContext;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterialConfig;
+import com.thoughtworks.go.config.materials.dependency.ExternalDependencyMaterialConfig;
 import com.thoughtworks.go.config.materials.git.GitMaterialConfig;
 import com.thoughtworks.go.config.materials.mercurial.HgMaterialConfig;
 import com.thoughtworks.go.config.materials.perforce.P4MaterialConfig;
@@ -275,6 +276,9 @@ public class MaterialConfigs extends BaseCollection<MaterialConfig> implements V
     public DependencyMaterialConfig getDependencyMaterial() {
         return getExistingOrDefaultMaterial(new DependencyMaterialConfig(new CaseInsensitiveString(""), new CaseInsensitiveString("")));
     }
+    public ExternalDependencyMaterialConfig getExternalDependencyMaterial() {
+        return getExistingOrDefaultMaterial(new ExternalDependencyMaterialConfig(new CaseInsensitiveString(""), new CaseInsensitiveString(""), new CaseInsensitiveString("")));
+    }
 
     public PackageMaterialConfig getPackageMaterial() {
         return getExistingOrDefaultMaterial(new PackageMaterialConfig());
@@ -314,6 +318,8 @@ public class MaterialConfigs extends BaseCollection<MaterialConfig> implements V
             addMaterialConfig(getP4Material(), (Map) attributeMap.get(P4MaterialConfig.TYPE));
         } else if (DependencyMaterialConfig.TYPE.equals(materialType)) {
             addMaterialConfig(getDependencyMaterial(), (Map) attributeMap.get(DependencyMaterialConfig.TYPE));
+        } else if (ExternalDependencyMaterialConfig.TYPE.equals(materialType)) {
+            addMaterialConfig(getExternalDependencyMaterial(), (Map) attributeMap.get(ExternalDependencyMaterialConfig.TYPE));
         } else if (TfsMaterialConfig.TYPE.equals(materialType)) {
             addMaterialConfig(getTfsMaterial(), (Map) attributeMap.get(TfsMaterialConfig.TYPE));
         } else if (PackageMaterialConfig.TYPE.equals(materialType)) {
